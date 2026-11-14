@@ -85,7 +85,7 @@
           <div id="headerLogoSlot" class="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center shrink-0 overflow-hidden p-0.5"></div>
           <div>
             <h2 id="pageTitle" class="text-lg sm:text-xl font-extrabold text-slate-900">Dashboard</h2>
-            <p id="pageSubtitle" class="text-xs text-slate-500">Kacheri TC Ground • Season 2026/2027 • Currency: UGX</p>
+            <p id="pageSubtitle" class="text-xs text-slate-500">Kokuwam & Lokidind Grounds • Season 2026/2027 • Currency: UGX</p>
           </div>
         </div>
 
@@ -101,7 +101,7 @@
           <span class="px-2 py-0.5 rounded-md bg-sky-700 text-white font-bold uppercase tracking-wider text-[10px]">Players & Staff View</span>
           <span>You are viewing live club records in <strong>Read-Only Mode</strong>. Only authorized Club Administrators can add or edit entries.</span>
         </div>
-        <button onclick="openAdminLoginModal()" class="font-bold text-forest-800 hover:underline shrink-0">Admin Login &rarr;</button>
+        <button onclick="openAdminLoginModal()" class="font-bold text-forest-800 hover:underline shrink-0">ADMIN LOGIN &rarr;</button>
       </div>
 
       <!-- Toast Notification -->
@@ -164,7 +164,7 @@
     ];
 
     // =========================================================================
-    // INITIAL SEED DATA (SEASON 2026/2027 — KACHERI TC GROUND)
+    // INITIAL SEED DATA (SEASON 2026/2027 — KOKUWAM & LOKIDIND GROUNDS)
     // =========================================================================
     function createSeedDatabase() {
       return {
@@ -333,7 +333,7 @@
     function applyBranding() {
       const s = db.club_settings;
       document.getElementById('sidebarClubName').textContent = s.club_name;
-      document.getElementById('sidebarClubSub').textContent = `${s.nickname} • Kacheri TC`;
+      document.getElementById('sidebarClubSub').textContent = `${s.nickname} • Kokuwam & Lokidind`;
       document.getElementById('sidebarLogoSlot').innerHTML = renderCrestHtml();
       document.getElementById('headerLogoSlot').innerHTML = renderCrestHtml();
       document.getElementById('modalLogoSlot').innerHTML = renderCrestHtml();
@@ -385,7 +385,7 @@
             Players & Staff (View-Only)
           </span>
           <button onclick="openAdminLoginModal()" class="px-3.5 py-2 rounded-xl bg-forest-800 hover:bg-forest-700 text-white text-xs font-bold transition shadow-xs">
-            Admin Login
+            ADMIN LOGIN
           </button>
         `;
         sideSlot.innerHTML = `
