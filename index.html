@@ -101,7 +101,7 @@
           <span class="px-2 py-0.5 rounded-md bg-sky-700 text-white font-bold uppercase tracking-wider text-[10px]">Players & Staff View</span>
           <span>You are viewing live club records in <strong>Read-Only Mode</strong>. Only authorized Club Administrators can add or edit entries.</span>
         </div>
-        <button onclick="openAdminLoginModal()" class="font-bold text-forest-800 hover:underline shrink-0">ADMIN LOGIN &rarr;</button>
+        <button onclick="openAdminLoginModal()" class="font-bold text-forest-800 hover:underline shrink-0">ADMIN PAGE &rarr;</button>
       </div>
 
       <!-- Toast Notification -->
@@ -136,10 +136,12 @@
     // CENTRAL HILLS SC CLUB MANAGEMENT SYSTEM (chscms_v3)
     // =========================================================================
     const STORAGE_KEY = 'chscms_v3';
-    const ROLE_SESSION_KEY = 'chscms_v3_admin_auth';
     const DEFAULT_LOGO_SRC = 'club logo.jpeg';
 
-    let isAdmin = sessionStorage.getItem(ROLE_SESSION_KEY) === 'true';
+    let isAdmin = false;
+    let hasServerData = false;
+    let databaseSaveQueue = Promise.resolve();
+    let db = createSeedDatabase();
     let currentTab = 'dashboard';
     let uiFilters = {
       playerSearch: '',
@@ -180,7 +182,6 @@
           home_ground: 'Kacheri TC Ground',
           season: '2026/2027',
           currency: 'UGX',
-          admin_pin: '2023',
           custom_logo_data: ''
         },
         players: [
@@ -260,44 +261,112 @@
       };
     }
 
-    let db = loadDatabase();
+    function stripSensitiveFields(value, seen = new WeakSet()) {
+      if (Array.isArray(value)) {
+        return value.map(item => stripSensitiveFields(item, seen));
+      }
+      if (!value || typeof value !== 'object') {
+        return value;
+      }
+      if (seen.has(value)) {
+        return value;
+      }
+      seen.add(value);
 
-    function loadDatabase() {
+      const cleaned = {};
+      for (const [key, child] of Object.entries(value)) {
+        if (key === 'admin_pin') continue;
+        cleaned[key] = stripSensitiveFields(child, seen);
+      }
+      return cleaned;
+    }
+
+    function normalizeDatabase(parsed) {
+      const seed = createSeedDatabase();
+      const normalized = {
+        meta: parsed.meta || seed.meta,
+        club_settings: { ...seed.club_settings, ...(parsed.club_settings || {}) },
+        players: Array.isArray(parsed.players) ? parsed.players : seed.players,
+        uniform_stock: Array.isArray(parsed.uniform_stock) ? parsed.uniform_stock : seed.uniform_stock,
+        uniform_orders: Array.isArray(parsed.uniform_orders) ? parsed.uniform_orders : seed.uniform_orders,
+        transactions: Array.isArray(parsed.transactions) ? parsed.transactions : seed.transactions,
+        membership_fees: Array.isArray(parsed.membership_fees) ? parsed.membership_fees : seed.membership_fees,
+        training_sessions: Array.isArray(parsed.training_sessions) ? parsed.training_sessions : seed.training_sessions,
+        attendance_records: Array.isArray(parsed.attendance_records) ? parsed.attendance_records : seed.attendance_records,
+        matches: Array.isArray(parsed.matches) ? parsed.matches : seed.matches,
+        equipment: Array.isArray(parsed.equipment) ? parsed.equipment : seed.equipment,
+        notices: Array.isArray(parsed.notices) ? parsed.notices : seed.notices
+      };
+      return stripSensitiveFields(normalized);
+    }
+
+    function loadLegacyDatabase() {
       try {
         const raw = localStorage.getItem(STORAGE_KEY);
         if (raw) {
-          const parsed = JSON.parse(raw);
-          const seed = createSeedDatabase();
-          return {
-            meta: parsed.meta || seed.meta,
-            club_settings: { ...seed.club_settings, ...(parsed.club_settings || {}) },
-            players: Array.isArray(parsed.players) ? parsed.players : seed.players,
-            uniform_stock: Array.isArray(parsed.uniform_stock) ? parsed.uniform_stock : seed.uniform_stock,
-            uniform_orders: Array.isArray(parsed.uniform_orders) ? parsed.uniform_orders : seed.uniform_orders,
-            transactions: Array.isArray(parsed.transactions) ? parsed.transactions : seed.transactions,
-            membership_fees: Array.isArray(parsed.membership_fees) ? parsed.membership_fees : seed.membership_fees,
-            training_sessions: Array.isArray(parsed.training_sessions) ? parsed.training_sessions : seed.training_sessions,
-            attendance_records: Array.isArray(parsed.attendance_records) ? parsed.attendance_records : seed.attendance_records,
-            matches: Array.isArray(parsed.matches) ? parsed.matches : seed.matches,
-            equipment: Array.isArray(parsed.equipment) ? parsed.equipment : seed.equipment,
-            notices: Array.isArray(parsed.notices) ? parsed.notices : seed.notices
-          };
+          return normalizeDatabase(JSON.parse(raw));
         }
       } catch (e) {
-        console.warn('Resetting corrupted storage state:', e);
+        console.warn('Unable to read legacy browser data:', e);
       }
-      const fresh = createSeedDatabase();
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(fresh));
-      return fresh;
+      return createSeedDatabase();
+    }
+
+    async function apiRequest(path, options = {}) {
+      const response = await fetch(path, {
+        credentials: 'same-origin',
+        ...options,
+        headers: {
+          ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+          ...options.headers
+        }
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        const error = new Error(result.error || 'The server request failed.');
+        error.status = response.status;
+        throw error;
+      }
+      return result;
+    }
+
+    async function initializeApp() {
+      try {
+        const [serverData, session] = await Promise.all([
+          apiRequest('/api/data'),
+          apiRequest('/api/session')
+        ]);
+        hasServerData = serverData !== null;
+        db = hasServerData ? normalizeDatabase(serverData) : loadLegacyDatabase();
+        isAdmin = session.authenticated;
+        renderApp();
+      } catch (error) {
+        db = loadLegacyDatabase();
+        isAdmin = false;
+        renderApp();
+        showToast(`Could not connect to the server. Changes cannot be saved: ${error.message}`, true);
+      }
     }
 
     function saveDatabase() {
-      try {
-        db.meta.updated_at = new Date().toISOString().slice(0, 10);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
-      } catch (e) {
-        showToast('Warning: Could not persist changes to browser storage.', true);
-      }
+      db.meta.updated_at = new Date().toISOString().slice(0, 10);
+      const snapshot = normalizeDatabase(JSON.parse(JSON.stringify(db)));
+      const save = databaseSaveQueue.then(async () => {
+        await apiRequest('/api/data', {
+          method: 'PUT',
+          body: JSON.stringify(snapshot)
+        });
+        hasServerData = true;
+      });
+      databaseSaveQueue = save.catch(() => {});
+      return save.catch(error => {
+        if (error.status === 401) {
+          isAdmin = false;
+          renderApp();
+        }
+        showToast(`Could not save changes to the server: ${error.message}`, true);
+        return false;
+      });
     }
 
     // =========================================================================
@@ -385,7 +454,7 @@
             Players & Staff (View-Only)
           </span>
           <button onclick="openAdminLoginModal()" class="px-3.5 py-2 rounded-xl bg-forest-800 hover:bg-forest-700 text-white text-xs font-bold transition shadow-xs">
-            ADMIN LOGIN
+            ADMIN PAGE
           </button>
         `;
         sideSlot.innerHTML = `
@@ -414,9 +483,9 @@
           </div>
           <div>
             <label class="block text-xs font-bold text-slate-700 mb-1">Enter Administrator PIN *</label>
-            <input type="password" name="pin" required autofocus placeholder="••••"
+            <input type="password" name="pin" required maxlength="128" autofocus placeholder="••••"
               class="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-base tracking-widest font-bold focus:outline-none focus:ring-2 focus:ring-forest-700" />
-            <p class="text-[11px] text-slate-500 mt-1.5">Default Club Founding PIN: <span class="font-mono font-bold text-forest-800">2023</span></p>
+            <p class="text-[11px] text-slate-500 mt-1.5">Administrator PINs are checked and stored securely by the server.</p>
           </div>
           <div class="flex justify-end gap-2 pt-2">
             <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 font-semibold">Stay View-Only</button>
@@ -426,26 +495,44 @@
       `);
     }
 
-    function submitAdminLogin(e) {
+    async function submitAdminLogin(e) {
       e.preventDefault();
       const entered = new FormData(e.target).get('pin').trim();
-      const expected = String(db.club_settings.admin_pin || '2023');
-      if (entered === expected) {
+      let authenticated = false;
+      try {
+        await apiRequest('/api/login', {
+          method: 'POST',
+          body: JSON.stringify({ pin: entered })
+        });
+        authenticated = true;
         isAdmin = true;
-        sessionStorage.setItem(ROLE_SESSION_KEY, 'true');
+        if (!hasServerData && !await saveDatabase()) {
+          isAdmin = false;
+          renderApp();
+          await apiRequest('/api/logout', { method: 'POST', body: '{}' });
+          throw new Error('The server data could not be initialized. Please try again.');
+        }
         closeModal();
         renderApp();
         showToast('Admin Mode unlocked. All data entry controls are now active.');
-      } else {
-        showToast('Incorrect Admin PIN. Access denied.', true);
+      } catch (error) {
+        if (authenticated && isAdmin) {
+          isAdmin = false;
+          renderApp();
+        }
+        showToast(error.message, true);
       }
     }
 
-    function logoutAdmin() {
+    async function logoutAdmin() {
       isAdmin = false;
-      sessionStorage.removeItem(ROLE_SESSION_KEY);
       renderApp();
-      showToast('Switched to Players & Staff View-Only Mode.');
+      try {
+        await apiRequest('/api/logout', { method: 'POST', body: '{}' });
+        showToast('Switched to Players & Staff View-Only Mode.');
+      } catch (error) {
+        showToast(`Could not end the server session: ${error.message}`, true);
+      }
     }
 
     // =========================================================================
@@ -2418,7 +2505,7 @@
                 <p class="font-bold text-sm text-slate-900">Change Administrator PIN</p>
                 <p class="text-xs text-slate-500">Update the PIN required to unlock data entry mode.</p>
                 <div class="flex gap-2">
-                  <input type="password" name="new_pin" required minlength="4" placeholder="New PIN (min 4 chars)" class="flex-1 px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-xs" />
+                  <input type="password" name="new_pin" required minlength="8" maxlength="128" placeholder="New PIN (8-128 chars)" class="flex-1 px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-xs" />
                   <button type="submit" class="px-3.5 py-1.5 rounded-lg bg-forest-800 text-white text-xs font-bold">Update PIN</button>
                 </div>
               </form>
@@ -2442,21 +2529,30 @@
               <h3 class="font-bold text-slate-900 text-sm">Administrative System Settings</h3>
               <p class="text-xs text-slate-500 mt-0.5">Crest configuration, PIN management, and database backups are restricted to authorized Club Administrators.</p>
             </div>
-            <button onclick="openAdminLoginModal()" class="px-4 py-2 rounded-xl bg-forest-800 text-white text-xs font-bold shrink-0">Admin Login</button>
+            <button onclick="openAdminLoginModal()" class="px-4 py-2 rounded-xl bg-forest-800 text-white text-xs font-bold shrink-0">ADMIN PAGE</button>
           </div>
         `}
       `;
     }
 
-    function changeAdminPin(e) {
+    async function changeAdminPin(e) {
       e.preventDefault();
       if (!guardAdminAction()) return;
       const newPin = new FormData(e.target).get('new_pin').trim();
-      if (newPin.length < 4) return;
-      db.club_settings.admin_pin = newPin;
-      saveDatabase();
-      e.target.reset();
-      showToast('Administrator PIN updated successfully.');
+      if (newPin.length < 8 || newPin.length > 128) {
+        showToast('The administrator PIN must be between 8 and 128 characters.', true);
+        return;
+      }
+      try {
+        await apiRequest('/api/admin/pin', {
+          method: 'PUT',
+          body: JSON.stringify({ newPin })
+        });
+        e.target.reset();
+        showToast('Administrator PIN updated successfully.');
+      } catch (error) {
+        showToast(`Could not update administrator PIN: ${error.message}`, true);
+      }
     }
 
     function resetCustomLogo() {
@@ -2572,7 +2668,7 @@
     }
 
     // Boot application
-    window.addEventListener('DOMContentLoaded', renderApp);
+    window.addEventListener('DOMContentLoaded', initializeApp);
   </script>
 </body>
 </html>
