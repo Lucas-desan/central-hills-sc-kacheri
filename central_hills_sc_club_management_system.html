@@ -1,0 +1,2578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Central Hills SC — Club Management System</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            display: ['Plus Jakarta Sans', 'Inter', 'sans-serif']
+          },
+          colors: {
+            forest: {
+              950: '#091a11',
+              900: '#102b1c',
+              800: '#14532d',
+              700: '#166534',
+              600: '#15803d',
+            },
+            limeclub: '#a3e635',
+            goldclub: '#d6a83b',
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    h1, h2, h3, h4 { font-family: 'Plus Jakarta Sans', 'Inter', sans-serif; }
+    .scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+    .scrollbar-thin::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+    @media print {
+      body * { visibility: hidden; }
+      #print-area, #print-area * { visibility: visible; }
+      #print-area { position: fixed; inset: 0; background: #fff; padding: 24px; z-index: 9999; }
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 antialiased">
+
+  <!-- Hidden file inputs -->
+  <input type="file" id="jsonFileInput" accept=".json,application/json" class="hidden" />
+  <input type="file" id="logoFileInput" accept="image/*" class="hidden" />
+
+  <!-- Mobile Sidebar Backdrop -->
+  <div id="sidebarBackdrop" class="fixed inset-0 bg-slate-900/60 z-30 hidden lg:hidden" onclick="toggleSidebar(false)"></div>
+
+  <div class="min-h-screen flex">
+    <!-- Sidebar -->
+    <aside id="sidebar" class="fixed lg:static inset-y-0 left-0 z-40 w-72 bg-forest-900 text-white flex flex-col transform -translate-x-full lg:translate-x-0 transition-transform duration-200 shadow-xl">
+      <!-- Club Crest Header -->
+      <div class="p-4 border-b border-white/10 flex items-center gap-3">
+        <div id="sidebarLogoSlot" class="w-14 h-14 rounded-2xl bg-white/95 border-2 border-goldclub flex items-center justify-center shrink-0 overflow-hidden shadow-md p-0.5"></div>
+        <div class="min-w-0">
+          <h1 id="sidebarClubName" class="font-extrabold text-base tracking-tight text-white truncate">Central Hills SC</h1>
+          <p id="sidebarClubSub" class="text-xs text-limeclub font-semibold truncate">The Mountaineers • Kacheri TC</p>
+          <span class="inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/10 text-goldclub">Season 2026/2027</span>
+        </div>
+      </div>
+
+      <!-- Navigation Links -->
+      <nav id="navMenu" class="flex-1 overflow-y-auto scrollbar-thin p-3 space-y-1 text-sm"></nav>
+
+      <!-- Role & Quick Controls Footer -->
+      <div class="p-4 border-t border-white/10 bg-forest-950/70 space-y-2.5">
+        <div id="sidebarRoleCard" class="p-3 rounded-xl bg-white/5 border border-white/10"></div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <div class="flex-1 flex flex-col min-w-0">
+      <!-- Top Bar -->
+      <header class="sticky top-0 z-20 bg-white border-b border-slate-200 px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <button onclick="toggleSidebar(true)" class="lg:hidden p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700" aria-label="Open menu">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
+          </button>
+          <div id="headerLogoSlot" class="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center shrink-0 overflow-hidden p-0.5"></div>
+          <div>
+            <h2 id="pageTitle" class="text-lg sm:text-xl font-extrabold text-slate-900">Dashboard</h2>
+            <p id="pageSubtitle" class="text-xs text-slate-500">Kacheri TC Ground • Season 2026/2027 • Currency: UGX</p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2.5 flex-wrap">
+          <!-- Role Status & Switcher -->
+          <div id="topRoleControls" class="flex items-center gap-2"></div>
+        </div>
+      </header>
+
+      <!-- View-Only Info Strip for Players & Staff -->
+      <div id="viewOnlyStrip" class="mx-4 sm:mx-6 mt-4 px-4 py-2.5 rounded-2xl bg-sky-50 border border-sky-200 text-sky-900 flex flex-wrap items-center justify-between gap-2 text-xs">
+        <div class="flex items-center gap-2">
+          <span class="px-2 py-0.5 rounded-md bg-sky-700 text-white font-bold uppercase tracking-wider text-[10px]">Players & Staff View</span>
+          <span>You are viewing live club records in <strong>Read-Only Mode</strong>. Only authorized Club Administrators can add or edit entries.</span>
+        </div>
+        <button onclick="openAdminLoginModal()" class="font-bold text-forest-800 hover:underline shrink-0">Admin Login &rarr;</button>
+      </div>
+
+      <!-- Toast Notification -->
+      <div id="toastBox" class="fixed bottom-5 right-5 z-50 hidden max-w-sm px-4 py-3 rounded-2xl shadow-lg bg-forest-900 text-white text-sm font-medium border border-limeclub/40"></div>
+
+      <!-- Dynamic Module Viewport -->
+      <main id="appViewport" class="flex-1 p-4 sm:p-6 space-y-6 max-w-7xl w-full mx-auto"></main>
+    </div>
+  </div>
+
+  <!-- Reusable Modal Container -->
+  <div id="modalOverlay" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs hidden items-center justify-center p-4 overflow-y-auto">
+    <div id="modalCard" class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl overflow-hidden my-auto">
+      <div class="px-6 py-4 bg-forest-900 text-white flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <div id="modalLogoSlot" class="w-8 h-8 rounded-lg bg-white p-0.5 flex items-center justify-center overflow-hidden shrink-0"></div>
+          <h3 id="modalTitle" class="font-bold text-base">Modal</h3>
+        </div>
+        <button onclick="closeModal()" class="p-1.5 rounded-lg hover:bg-white/10 text-slate-300 hover:text-white">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div id="modalBody" class="p-6 max-h-[82vh] overflow-y-auto scrollbar-thin"></div>
+    </div>
+  </div>
+
+  <!-- Hidden Print Container -->
+  <div id="print-area" class="hidden"></div>
+
+  <script>
+    // =========================================================================
+    // CENTRAL HILLS SC CLUB MANAGEMENT SYSTEM (chscms_v3)
+    // =========================================================================
+    const STORAGE_KEY = 'chscms_v3';
+    const ROLE_SESSION_KEY = 'chscms_v3_admin_auth';
+    const DEFAULT_LOGO_SRC = 'club logo.jpeg';
+
+    let isAdmin = sessionStorage.getItem(ROLE_SESSION_KEY) === 'true';
+    let currentTab = 'dashboard';
+    let uiFilters = {
+      playerSearch: '',
+      playerPosition: 'All',
+      txType: 'All',
+      feeStatus: 'All',
+      matchFilter: 'All',
+      selectedSessionId: ''
+    };
+
+    const NAV_ITEMS = [
+      { id: 'dashboard', label: 'Dashboard', subtitle: 'Club Overview & Live KPIs' },
+      { id: 'players', label: 'Players & Squad', subtitle: 'Squad Roster, Jersey Names & Profiles' },
+      { id: 'uniforms', label: 'Uniforms & Orders', subtitle: 'Kit Stock & Player/Fan Kit Orders' },
+      { id: 'finance', label: 'Payments & Expenses', subtitle: 'UGX Ledger, Kit Categories & Receipts' },
+      { id: 'fees', label: 'Membership Fees', subtitle: 'Monthly Subscriptions & Balances' },
+      { id: 'attendance', label: 'Training Attendance', subtitle: 'Session Roll-Call & Squad Summary' },
+      { id: 'matches', label: 'Matches & Fixtures', subtitle: 'Schedule & Completed Match Results' },
+      { id: 'equipment', label: 'Equipment Inventory', subtitle: 'Training & Matchday Gear' },
+      { id: 'notices', label: 'Noticeboard', subtitle: 'Official Club Announcements' },
+      { id: 'reports', label: 'Reports & Admin', subtitle: 'Executive Summaries, CSV & Security' }
+    ];
+
+    // =========================================================================
+    // INITIAL SEED DATA (SEASON 2026/2027 — KACHERI TC GROUND)
+    // =========================================================================
+    function createSeedDatabase() {
+      return {
+        meta: {
+          system: 'Central Hills SC Club Management System',
+          season: '2026/2027',
+          updated_at: '2026-11-14'
+        },
+        club_settings: {
+          club_name: 'Central Hills SC',
+          nickname: 'The Mountaineers',
+          founded_year: '2023',
+          home_ground: 'Kacheri TC Ground',
+          season: '2026/2027',
+          currency: 'UGX',
+          admin_pin: '2023',
+          custom_logo_data: ''
+        },
+        players: [
+          { id: 'PL-001', full_name: 'Brian Mugisha', jersey_name: 'MUGISHA', jersey_number: 1, position: 'Goalkeeper', date_of_birth: '2001-04-12', phone: '+256 772 410 112', guardian_contact: 'Sarah Mugisha (+256 701 332 901)', national_id: 'CM01042108892K', medical_notes: 'Fit & Cleared', status: 'Active', joined_date: '2023-03-10' },
+          { id: 'PL-002', full_name: 'Denis Kato', jersey_name: 'KATO', jersey_number: 4, position: 'Defender', date_of_birth: '2002-08-19', phone: '+256 782 650 319', guardian_contact: 'Peter Kato (+256 752 889 410)', national_id: 'CM02081904412H', medical_notes: 'Fit & Cleared', status: 'Active', joined_date: '2023-03-12' },
+          { id: 'PL-003', full_name: 'Emmanuel Okello', jersey_name: 'OKELLO', jersey_number: 5, position: 'Defender', date_of_birth: '2000-11-03', phone: '+256 704 221 980', guardian_contact: 'Grace Akello (+256 774 120 554)', national_id: 'CM00110309921L', medical_notes: 'Club Captain • Cleared', status: 'Active', joined_date: '2023-03-10' },
+          { id: 'PL-004', full_name: 'Ronald Ssemakula', jersey_name: 'SSEMAKULA', jersey_number: 6, position: 'Midfielder', date_of_birth: '2003-02-25', phone: '+256 756 908 114', guardian_contact: 'Joseph Ssemakula (+256 772 511 098)', national_id: 'CM03022501143P', medical_notes: 'Fit & Cleared', status: 'Active', joined_date: '2024-01-15' },
+          { id: 'PL-005', full_name: 'Ivan Byaruhanga', jersey_name: 'BYARUHANGA', jersey_number: 8, position: 'Midfielder', date_of_birth: '2002-06-14', phone: '+256 779 340 772', guardian_contact: 'Ruth Byaruhanga (+256 703 449 211)', national_id: 'CM02061407721R', medical_notes: 'Fit & Cleared', status: 'Active', joined_date: '2023-04-02' },
+          { id: 'PL-006', full_name: 'Allan Tumusiime', jersey_name: 'TUMUSIIME', jersey_number: 9, position: 'Forward', date_of_birth: '2001-09-30', phone: '+256 705 812 643', guardian_contact: 'David Tumusiime (+256 772 904 118)', national_id: 'CM01093006618T', medical_notes: 'Fit & Cleared', status: 'Active', joined_date: '2023-03-18' },
+          { id: 'PL-007', full_name: 'Patrick Nsubuga', jersey_name: 'NSUBUGA', jersey_number: 10, position: 'Midfielder', date_of_birth: '2002-12-07', phone: '+256 784 502 889', guardian_contact: 'Mary Nsubuga (+256 751 209 674)', national_id: 'CM02120703319N', medical_notes: 'Minor ankle strapping', status: 'Active', joined_date: '2024-02-04' },
+          { id: 'PL-008', full_name: 'Samuel Wasswa', jersey_name: 'WASSWA', jersey_number: 11, position: 'Forward', date_of_birth: '2003-05-17', phone: '+256 775 190 432', guardian_contact: ' Harriet Nakato (+256 702 661 305)', national_id: 'CM03051705528W', medical_notes: 'Hamstring rehab', status: 'Injured', joined_date: '2024-06-20' }
+        ],
+        uniform_stock: [
+          { id: 'STK-01', item_name: 'Home Match Jersey (Forest/Lime)', kit_type: 'Home Kit', size_category: 'Player', size: 'M', unit_price_ugx: 65000, quantity_available: 12 },
+          { id: 'STK-02', item_name: 'Home Match Jersey (Forest/Lime)', kit_type: 'Home Kit', size_category: 'Player', size: 'L', unit_price_ugx: 65000, quantity_available: 14 },
+          { id: 'STK-03', item_name: 'Supporters Replica Jersey', kit_type: 'Fan Jersey', size_category: 'Fan', size: 'XL', unit_price_ugx: 50000, quantity_available: 18 },
+          { id: 'STK-04', item_name: 'Training Bib & Shorts Set', kit_type: 'Training Kit', size_category: 'Player', size: 'L', unit_price_ugx: 45000, quantity_available: 9 }
+        ],
+        uniform_orders: [
+          { id: 'ORD-001', player_id: 'PL-003', jersey_name: 'OKELLO', jersey_number: 5, size_category: 'Player - L', stock_id: 'STK-02', quantity: 1, total_amount_ugx: 65000, amount_paid_ugx: 65000, payment_status: 'Paid', delivery_status: 'Delivered', order_date: '2026-10-05' },
+          { id: 'ORD-002', player_id: 'PL-006', jersey_name: 'TUMUSIIME', jersey_number: 9, size_category: 'Player - L', stock_id: 'STK-02', quantity: 1, total_amount_ugx: 65000, amount_paid_ugx: 40000, payment_status: 'Partial', delivery_status: 'Delivered', order_date: '2026-10-18' }
+        ],
+        transactions: [
+          { id: 'TX-001', receipt_number: 'RCT-2026-1001', tx_type: 'Income', category: 'Uniform Payment', description: 'Home Match Jersey Full Payment', player_id: 'PL-003', payer_name: 'Emmanuel Okello', jersey_name: 'OKELLO', jersey_number: '5', size_category: 'Player - L', amount_ugx: 65000, payment_method: 'MTN MoMo', tx_date: '2026-10-05', recorded_by: 'Club Admin' },
+          { id: 'TX-002', receipt_number: 'RCT-2026-1002', tx_type: 'Income', category: 'Uniform Payment', description: 'Home Match Jersey Deposit', player_id: 'PL-006', payer_name: 'Allan Tumusiime', jersey_name: 'TUMUSIIME', jersey_number: '9', size_category: 'Player - L', amount_ugx: 40000, payment_method: 'Cash', tx_date: '2026-10-18', recorded_by: 'Club Admin' },
+          { id: 'TX-003', receipt_number: 'RCT-2026-1003', tx_type: 'Income', category: 'Fan Jersey Sale', description: 'Supporters Replica Jersey Purchase', player_id: null, payer_name: 'Hon. Robert Kiconco (Supporter)', jersey_name: 'KICONCO', jersey_number: '12', size_category: 'Fan - XL', amount_ugx: 50000, payment_method: 'MTN MoMo', tx_date: '2026-10-24', recorded_by: 'Club Admin' },
+          { id: 'TX-004', receipt_number: 'RCT-2026-1004', tx_type: 'Income', category: 'Membership Fee', description: 'November 2026 Monthly Subscription', player_id: 'PL-001', payer_name: 'Brian Mugisha', jersey_name: 'MUGISHA', jersey_number: '1', size_category: 'Player - L', amount_ugx: 30000, payment_method: 'Airtel Money', tx_date: '2026-11-02', recorded_by: 'Club Admin' },
+          { id: 'TX-005', receipt_number: 'RCT-2026-1005', tx_type: 'Income', category: 'Club Sponsorship', description: 'Kacheri Traders Community Matchday Grant', player_id: null, payer_name: 'Kacheri Hardware & Agro', jersey_name: 'N/A', jersey_number: 'N/A', size_category: 'N/A', amount_ugx: 450000, payment_method: 'Bank Transfer', tx_date: '2026-11-04', recorded_by: 'Club Admin' },
+          { id: 'TX-006', receipt_number: 'RCT-2026-1006', tx_type: 'Expense', category: 'Match Officials & Pitch', description: 'Center Referee & Assistant Referees Allowance', player_id: null, payer_name: 'District Referees Board', jersey_name: 'N/A', jersey_number: 'N/A', size_category: 'N/A', amount_ugx: 120000, payment_method: 'Cash', tx_date: '2026-11-08', recorded_by: 'Club Admin' }
+        ],
+        membership_fees: [
+          { id: 'FEE-001', player_id: 'PL-001', period_label: 'November 2026', fee_type: 'Monthly Subscription', amount_due_ugx: 30000, amount_paid_ugx: 30000, due_date: '2026-11-05', status: 'Paid' },
+          { id: 'FEE-002', player_id: 'PL-002', period_label: 'November 2026', fee_type: 'Monthly Subscription', amount_due_ugx: 30000, amount_paid_ugx: 15000, due_date: '2026-11-05', status: 'Partial' },
+          { id: 'FEE-003', player_id: 'PL-003', period_label: 'November 2026', fee_type: 'Monthly Subscription', amount_due_ugx: 30000, amount_paid_ugx: 30000, due_date: '2026-11-05', status: 'Paid' },
+          { id: 'FEE-004', player_id: 'PL-004', period_label: 'November 2026', fee_type: 'Monthly Subscription', amount_due_ugx: 30000, amount_paid_ugx: 0, due_date: '2026-11-05', status: 'Overdue' },
+          { id: 'FEE-005', player_id: 'PL-005', period_label: 'November 2026', fee_type: 'Monthly Subscription', amount_due_ugx: 30000, amount_paid_ugx: 30000, due_date: '2026-11-05', status: 'Paid' },
+          { id: 'FEE-006', player_id: 'PL-006', period_label: 'November 2026', fee_type: 'Monthly Subscription', amount_due_ugx: 30000, amount_paid_ugx: 20000, due_date: '2026-11-05', status: 'Partial' }
+        ],
+        training_sessions: [
+          { id: 'TRN-01', session_date: '2026-11-12', session_time: '16:30', venue: 'Kacheri TC Ground', focus_area: 'High Press & Set-Piece Delivery', coach_in_charge: 'Coach Moses Kaggwa' },
+          { id: 'TRN-02', session_date: '2026-11-10', session_time: '16:30', venue: 'Kacheri TC Ground', focus_area: 'Defensive Compactness & Transition', coach_in_charge: 'Coach Moses Kaggwa' }
+        ],
+        attendance_records: [
+          { id: 1, session_id: 'TRN-01', player_id: 'PL-001', status: 'Present', remarks: 'Full session' },
+          { id: 2, session_id: 'TRN-01', player_id: 'PL-002', status: 'Present', remarks: '' },
+          { id: 3, session_id: 'TRN-01', player_id: 'PL-003', status: 'Present', remarks: 'Led warm-up' },
+          { id: 4, session_id: 'TRN-01', player_id: 'PL-004', status: 'Late', remarks: 'Arrived 10 mins late' },
+          { id: 5, session_id: 'TRN-01', player_id: 'PL-005', status: 'Present', remarks: '' },
+          { id: 6, session_id: 'TRN-01', player_id: 'PL-006', status: 'Present', remarks: 'Sharp finishing' },
+          { id: 7, session_id: 'TRN-01', player_id: 'PL-007', status: 'Excused', remarks: 'Academic exam' },
+          { id: 8, session_id: 'TRN-01', player_id: 'PL-008', status: 'Excused', remarks: 'Physio recovery' },
+          { id: 9, session_id: 'TRN-02', player_id: 'PL-001', status: 'Present', remarks: '' },
+          { id: 10, session_id: 'TRN-02', player_id: 'PL-002', status: 'Present', remarks: '' },
+          { id: 11, session_id: 'TRN-02', player_id: 'PL-003', status: 'Present', remarks: '' },
+          { id: 12, session_id: 'TRN-02', player_id: 'PL-004', status: 'Present', remarks: '' },
+          { id: 13, session_id: 'TRN-02', player_id: 'PL-005', status: 'Absent', remarks: 'Unexcused' },
+          { id: 14, session_id: 'TRN-02', player_id: 'PL-006', status: 'Present', remarks: '' },
+          { id: 15, session_id: 'TRN-02', player_id: 'PL-007', status: 'Present', remarks: '' },
+          { id: 16, session_id: 'TRN-02', player_id: 'PL-008', status: 'Excused', remarks: 'Injury rehab' }
+        ],
+        matches: [
+          { id: 'MAT-01', opponent: 'Bukedea United FC', competition: 'Regional League 2026/27', venue_type: 'Home', venue_name: 'Kacheri TC Ground', match_date: '2026-11-21', kickoff_time: '16:00', goals_for: null, goals_against: null, status: 'Scheduled', match_notes: 'Squad assembly at Kacheri TC Ground by 14:30. Home Forest/Lime kit.' },
+          { id: 'MAT-02', opponent: 'Soroti City Strikers', competition: 'Regional League 2026/27', venue_type: 'Away', venue_name: 'Soroti Municipal Stadium', match_date: '2026-11-28', kickoff_time: '16:00', goals_for: null, goals_against: null, status: 'Scheduled', match_notes: 'Club bus departs Kacheri TC at 11:30 AM.' },
+          { id: 'MAT-03', opponent: 'Kumi Town Stars', competition: 'Regional League 2026/27', venue_type: 'Home', venue_name: 'Kacheri TC Ground', match_date: '2026-11-08', kickoff_time: '16:00', goals_for: 2, goals_against: 0, status: 'Completed', match_notes: 'Goals: Allan Tumusiime (24\'), Ivan Byaruhanga (71\'). Clean sheet for B. Mugisha.' },
+          { id: 'MAT-04', opponent: 'Ngora Highlanders', competition: 'Regional League 2026/27', venue_type: 'Away', venue_name: 'Ngora High Pitch', match_date: '2026-11-01', kickoff_time: '16:00', goals_for: 1, goals_against: 1, status: 'Completed', match_notes: 'Goal: Emmanuel Okello (58\' header).' }
+        ],
+        equipment: [
+          { id: 'EQP-01', item_name: 'FIFA Quality Pro Match Balls', category: 'Match Balls', quantity_total: 8, quantity_good: 7, condition_status: 'Good', last_checked: '2026-11-12' },
+          { id: 'EQP-02', item_name: 'Agility Cones & Slalom Poles', category: 'Training Gear', quantity_total: 40, quantity_good: 38, condition_status: 'Good', last_checked: '2026-11-10' },
+          { id: 'EQP-03', item_name: 'Portable Aluminum Goal Nets', category: 'Pitch Gear', quantity_total: 2, quantity_good: 1, condition_status: 'Needs Repair', last_checked: '2026-11-08' },
+          { id: 'EQP-04', item_name: 'First Aid & Ice Spray Kit', category: 'Medical', quantity_total: 2, quantity_good: 2, condition_status: 'Good', last_checked: '2026-11-12' }
+        ],
+        notices: [
+          { id: 'NOT-01', title: 'Matchday Call-Up: Bukedea United FC at Kacheri TC Ground', category: 'Matchday', body: 'All registered players must report to Kacheri TC Ground by 2:30 PM on Saturday, 21 Nov 2026 with shin guards and official club socks.', pinned: 1, created_at: '2026-11-13', author: 'Head Coach Moses Kaggwa' },
+          { id: 'NOT-02', title: 'November 2026 Subscription & Kit Balance Clearance', category: 'Finance', body: 'Players with pending November subscriptions or jersey balances should clear with the Club Treasurer before Friday training.', pinned: 1, created_at: '2026-11-11', author: 'Club Administration' }
+        ]
+      };
+    }
+
+    let db = loadDatabase();
+
+    function loadDatabase() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          const seed = createSeedDatabase();
+          return {
+            meta: parsed.meta || seed.meta,
+            club_settings: { ...seed.club_settings, ...(parsed.club_settings || {}) },
+            players: Array.isArray(parsed.players) ? parsed.players : seed.players,
+            uniform_stock: Array.isArray(parsed.uniform_stock) ? parsed.uniform_stock : seed.uniform_stock,
+            uniform_orders: Array.isArray(parsed.uniform_orders) ? parsed.uniform_orders : seed.uniform_orders,
+            transactions: Array.isArray(parsed.transactions) ? parsed.transactions : seed.transactions,
+            membership_fees: Array.isArray(parsed.membership_fees) ? parsed.membership_fees : seed.membership_fees,
+            training_sessions: Array.isArray(parsed.training_sessions) ? parsed.training_sessions : seed.training_sessions,
+            attendance_records: Array.isArray(parsed.attendance_records) ? parsed.attendance_records : seed.attendance_records,
+            matches: Array.isArray(parsed.matches) ? parsed.matches : seed.matches,
+            equipment: Array.isArray(parsed.equipment) ? parsed.equipment : seed.equipment,
+            notices: Array.isArray(parsed.notices) ? parsed.notices : seed.notices
+          };
+        }
+      } catch (e) {
+        console.warn('Resetting corrupted storage state:', e);
+      }
+      const fresh = createSeedDatabase();
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(fresh));
+      return fresh;
+    }
+
+    function saveDatabase() {
+      try {
+        db.meta.updated_at = new Date().toISOString().slice(0, 10);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+      } catch (e) {
+        showToast('Warning: Could not persist changes to browser storage.', true);
+      }
+    }
+
+    // =========================================================================
+    // CLUB LOGO COMPONENT (ch logo.jpeg + BESPOKE CREST SVG FALLBACK)
+    // =========================================================================
+    function getLogoSrc() {
+      return db.club_settings.custom_logo_data || DEFAULT_LOGO_SRC;
+    }
+
+    function renderCrestHtml(sizeClass = 'w-full h-full') {
+      const src = escapeHtml(getLogoSrc());
+      return `
+        <img src="${src}" alt="Central Hills SC Logo"
+          onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+          class="${sizeClass} object-contain rounded-lg" />
+        <div style="display:none;" class="${sizeClass} items-center justify-center">
+          <svg viewBox="0 0 120 120" class="w-full h-full" xmlns="http://www.w3.org/2000/svg">
+            <path d="M60 6 L108 26 L102 74 C98 96 80 109 60 115 C40 109 22 96 18 74 L12 26 Z" fill="#102b1c" stroke="#d6a83b" stroke-width="4.5"/>
+            <path d="M22 66 L44 38 L58 55 L74 33 L98 66 Z" fill="#3f7d20"/>
+            <path d="M44 38 L58 55 L74 33 L82 47 L60 44 L40 48 Z" fill="#a3e635"/>
+            <rect x="20" y="57" width="80" height="15" rx="4" fill="#0d9488" stroke="#d6a83b" stroke-width="1.5"/>
+            <text x="60" y="67.5" text-anchor="middle" fill="#091a11" font-size="8.5" font-weight="800" font-family="Inter,sans-serif">SINCE 2023</text>
+            <circle cx="60" cy="84" r="11" fill="#ffffff" stroke="#091a11" stroke-width="1.8"/>
+            <polygon points="60,78 65,82 63,88 57,88 55,82" fill="#091a11"/>
+            <path d="M54 91 H66 L64 98 H56 Z" fill="#d6a83b"/>
+            <rect x="16" y="99" width="88" height="13" rx="3" fill="#0f766e" stroke="#d6a83b" stroke-width="1.5"/>
+            <text x="60" y="108" text-anchor="middle" fill="#fde047" font-size="7.2" font-weight="800" font-family="Inter,sans-serif">THE MOUNTAINEERS</text>
+          </svg>
+        </div>
+      `;
+    }
+
+    function applyBranding() {
+      const s = db.club_settings;
+      document.getElementById('sidebarClubName').textContent = s.club_name;
+      document.getElementById('sidebarClubSub').textContent = `${s.nickname} • Kacheri TC`;
+      document.getElementById('sidebarLogoSlot').innerHTML = renderCrestHtml();
+      document.getElementById('headerLogoSlot').innerHTML = renderCrestHtml();
+      document.getElementById('modalLogoSlot').innerHTML = renderCrestHtml();
+    }
+
+    // =========================================================================
+    // ROLE-BASED ACCESS CONTROL (ADMIN vs. PLAYERS & STAFF VIEW-ONLY)
+    // =========================================================================
+    function guardAdminAction() {
+      if (!isAdmin) {
+        showToast('Action locked: Only authorized Club Admins can enter or edit records.', true);
+        openAdminLoginModal();
+        return false;
+      }
+      return true;
+    }
+
+    function renderRoleControls() {
+      const topSlot = document.getElementById('topRoleControls');
+      const sideSlot = document.getElementById('sidebarRoleCard');
+      const strip = document.getElementById('viewOnlyStrip');
+
+      if (isAdmin) {
+        strip.classList.add('hidden');
+        topSlot.innerHTML = `
+          <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+            <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+            Admin Mode Unlocked
+          </span>
+          <button onclick="logoutAdmin()" class="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition">
+            Lock / View-Only
+          </button>
+        `;
+        sideSlot.innerHTML = `
+          <div class="flex items-center justify-between text-xs">
+            <span class="text-limeclub font-bold">Role: Club Admin</span>
+            <span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[10px] font-bold">EDIT ACCESS</span>
+          </div>
+          <p class="text-[11px] text-slate-300 mt-1">All entry forms and updates are enabled.</p>
+          <button onclick="logoutAdmin()" class="mt-2.5 w-full py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition">
+            Switch to View-Only
+          </button>
+        `;
+      } else {
+        strip.classList.remove('hidden');
+        topSlot.innerHTML = `
+          <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-slate-100 text-slate-700 border border-slate-300">
+            <span class="w-2 h-2 rounded-full bg-sky-500"></span>
+            Players & Staff (View-Only)
+          </span>
+          <button onclick="openAdminLoginModal()" class="px-3.5 py-2 rounded-xl bg-forest-800 hover:bg-forest-700 text-white text-xs font-bold transition shadow-xs">
+            Admin Login
+          </button>
+        `;
+        sideSlot.innerHTML = `
+          <div class="flex items-center justify-between text-xs">
+            <span class="text-slate-200 font-bold">Players & Staff</span>
+            <span class="px-2 py-0.5 rounded bg-sky-500/20 text-sky-300 text-[10px] font-bold">VIEW ONLY</span>
+          </div>
+          <p class="text-[11px] text-slate-400 mt-1">Browse schedules, squad & receipts. Admin PIN required to edit.</p>
+          <button onclick="openAdminLoginModal()" class="mt-2.5 w-full py-2 rounded-xl bg-limeclub hover:bg-lime-300 text-forest-950 text-xs font-extrabold transition">
+            Unlock Admin Access
+          </button>
+        `;
+      }
+    }
+
+    function openAdminLoginModal() {
+      openModal('Club Administrator Authorization', `
+        <form onsubmit="submitAdminLogin(event)" class="space-y-4 text-sm">
+          <div class="flex items-center gap-4 p-4 rounded-2xl bg-forest-900 text-white">
+            <div class="w-16 h-16 rounded-2xl bg-white p-1 shrink-0 overflow-hidden">${renderCrestHtml()}</div>
+            <div>
+              <p class="text-xs text-limeclub font-bold uppercase tracking-wider">Central Hills SC • Kacheri TC</p>
+              <h4 class="font-extrabold text-base">Admin Entry Verification</h4>
+              <p class="text-xs text-slate-300 mt-0.5">Players & Staff can view all records without logging in. Enter the Admin PIN to add or modify club data.</p>
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Enter Administrator PIN *</label>
+            <input type="password" name="pin" required autofocus placeholder="••••"
+              class="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-base tracking-widest font-bold focus:outline-none focus:ring-2 focus:ring-forest-700" />
+            <p class="text-[11px] text-slate-500 mt-1.5">Default Club Founding PIN: <span class="font-mono font-bold text-forest-800">2023</span></p>
+          </div>
+          <div class="flex justify-end gap-2 pt-2">
+            <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 font-semibold">Stay View-Only</button>
+            <button type="submit" class="px-5 py-2 rounded-xl bg-forest-800 hover:bg-forest-700 text-white font-bold">Unlock Admin Mode</button>
+          </div>
+        </form>
+      `);
+    }
+
+    function submitAdminLogin(e) {
+      e.preventDefault();
+      const entered = new FormData(e.target).get('pin').trim();
+      const expected = String(db.club_settings.admin_pin || '2023');
+      if (entered === expected) {
+        isAdmin = true;
+        sessionStorage.setItem(ROLE_SESSION_KEY, 'true');
+        closeModal();
+        renderApp();
+        showToast('Admin Mode unlocked. All data entry controls are now active.');
+      } else {
+        showToast('Incorrect Admin PIN. Access denied.', true);
+      }
+    }
+
+    function logoutAdmin() {
+      isAdmin = false;
+      sessionStorage.removeItem(ROLE_SESSION_KEY);
+      renderApp();
+      showToast('Switched to Players & Staff View-Only Mode.');
+    }
+
+    // =========================================================================
+    // GENERAL UTILITIES
+    // =========================================================================
+    function formatUGX(val) {
+      const num = Number(val) || 0;
+      return `${db.club_settings.currency || 'UGX'} ${num.toLocaleString('en-UG')}`;
+    }
+
+    function calculateAge(dob) {
+      if (!dob) return '—';
+      const birth = new Date(dob);
+      if (isNaN(birth)) return '—';
+      const today = new Date();
+      let age = today.getFullYear() - birth.getFullYear();
+      const m = today.getMonth() - birth.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+      return age;
+    }
+
+    function getPlayer(playerId) {
+      return db.players.find(pl => pl.id === playerId) || null;
+    }
+
+    function getPlayerDisplay(playerId) {
+      const p = getPlayer(playerId);
+      return p ? `#${p.jersey_number} ${p.full_name}` : 'Club / Supporter';
+    }
+
+    function getStockItem(stockId) {
+      return db.uniform_stock.find(s => s.id === stockId) || null;
+    }
+
+    function nextId(prefix, list, pad = 3) {
+      let max = 0;
+      list.forEach(item => {
+        const m = String(item.id || '').match(/(\d+)$/);
+        if (m) max = Math.max(max, parseInt(m[1], 10));
+      });
+      return `${prefix}-${String(max + 1).padStart(pad, '0')}`;
+    }
+
+    function nextReceiptNumber() {
+      let max = 1000;
+      db.transactions.forEach(t => {
+        const m = String(t.receipt_number || '').match(/(\d+)$/);
+        if (m) max = Math.max(max, parseInt(m[1], 10));
+      });
+      return `RCT-2026-${max + 1}`;
+    }
+
+    function escapeHtml(str) {
+      return String(str ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function showToast(msg, isError = false) {
+      const box = document.getElementById('toastBox');
+      box.textContent = msg;
+      box.className = `fixed bottom-5 right-5 z-50 max-w-sm px-4 py-3 rounded-2xl shadow-lg text-sm font-medium border ${
+        isError ? 'bg-rose-900 text-white border-rose-400' : 'bg-forest-900 text-white border-limeclub/50'
+      }`;
+      box.classList.remove('hidden');
+      clearTimeout(window._toastTimer);
+      window._toastTimer = setTimeout(() => box.classList.add('hidden'), 3400);
+    }
+
+    function openModal(title, htmlContent) {
+      document.getElementById('modalTitle').textContent = title;
+      document.getElementById('modalBody').innerHTML = htmlContent;
+      const overlay = document.getElementById('modalOverlay');
+      overlay.classList.remove('hidden');
+      overlay.classList.add('flex');
+    }
+
+    function closeModal() {
+      const overlay = document.getElementById('modalOverlay');
+      overlay.classList.add('hidden');
+      overlay.classList.remove('flex');
+    }
+
+    function toggleSidebar(open) {
+      const sb = document.getElementById('sidebar');
+      const bd = document.getElementById('sidebarBackdrop');
+      if (open) {
+        sb.classList.remove('-translate-x-full');
+        bd.classList.remove('hidden');
+      } else {
+        sb.classList.add('-translate-x-full');
+        bd.classList.add('hidden');
+      }
+    }
+
+    function switchTab(tabId) {
+      currentTab = tabId;
+      toggleSidebar(false);
+      renderApp();
+    }
+
+    // =========================================================================
+    // NAVIGATION & MAIN SHELL RENDERER
+    // =========================================================================
+    function renderNav() {
+      const nav = document.getElementById('navMenu');
+      nav.innerHTML = NAV_ITEMS.map(item => {
+        const active = item.id === currentTab;
+        return `
+          <button onclick="switchTab('${item.id}')"
+            class="w-full text-left px-3.5 py-2.5 rounded-xl font-medium transition flex items-center justify-between ${
+              active
+                ? 'bg-limeclub text-forest-950 font-bold shadow-sm'
+                : 'text-slate-200 hover:bg-white/10 hover:text-white'
+            }">
+            <span>${item.label}</span>
+            ${active ? '<span class="w-2 h-2 rounded-full bg-forest-900"></span>' : ''}
+          </button>
+        `;
+      }).join('');
+
+      const meta = NAV_ITEMS.find(n => n.id === currentTab) || NAV_ITEMS[0];
+      document.getElementById('pageTitle').textContent = meta.label;
+      document.getElementById('pageSubtitle').textContent = `${meta.subtitle} • ${db.club_settings.home_ground} • Season ${db.club_settings.season}`;
+    }
+
+    function renderApp() {
+      applyBranding();
+      renderRoleControls();
+      renderNav();
+      const vp = document.getElementById('appViewport');
+      switch (currentTab) {
+        case 'dashboard': vp.innerHTML = renderDashboard(); break;
+        case 'players': vp.innerHTML = renderPlayers(); break;
+        case 'uniforms': vp.innerHTML = renderUniforms(); break;
+        case 'finance': vp.innerHTML = renderFinance(); break;
+        case 'fees': vp.innerHTML = renderFees(); break;
+        case 'attendance': vp.innerHTML = renderAttendance(); break;
+        case 'matches': vp.innerHTML = renderMatches(); break;
+        case 'equipment': vp.innerHTML = renderEquipment(); break;
+        case 'notices': vp.innerHTML = renderNotices(); break;
+        case 'reports': vp.innerHTML = renderReports(); break;
+      }
+    }
+
+    // =========================================================================
+    // 1. DASHBOARD MODULE
+    // =========================================================================
+    function renderDashboard() {
+      const activePlayers = db.players.filter(p => p.status === 'Active').length;
+      const totalIncome = db.transactions.filter(t => t.tx_type === 'Income').reduce((s, t) => s + Number(t.amount_ugx || 0), 0);
+      const totalExpense = db.transactions.filter(t => t.tx_type === 'Expense').reduce((s, t) => s + Number(t.amount_ugx || 0), 0);
+      const netCash = totalIncome - totalExpense;
+
+      const kitReceivables = db.uniform_orders
+        .filter(o => o.delivery_status !== 'Cancelled')
+        .reduce((s, o) => s + Math.max(0, Number(o.total_amount_ugx || 0) - Number(o.amount_paid_ugx || 0)), 0);
+      const feeReceivables = db.membership_fees
+        .reduce((s, f) => s + Math.max(0, Number(f.amount_due_ugx || 0) - Number(f.amount_paid_ugx || 0)), 0);
+      const pendingBalances = kitReceivables + feeReceivables;
+
+      const nextMatch = db.matches
+        .filter(m => m.status === 'Scheduled')
+        .sort((a, b) => a.match_date.localeCompare(b.match_date))[0];
+
+      const pinnedNotices = db.notices.filter(n => Number(n.pinned) === 1);
+      const recentTx = [...db.transactions].sort((a, b) => b.tx_date.localeCompare(a.tx_date)).slice(0, 5);
+
+      return `
+        <!-- KPI Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs">
+            <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Active Squad</p>
+            <p class="text-2xl font-extrabold text-forest-900 mt-1">${activePlayers} <span class="text-sm font-medium text-slate-500">/ ${db.players.length} Players</span></p>
+            <p class="text-xs text-emerald-700 mt-2 font-semibold">Season ${escapeHtml(db.club_settings.season)} Roster</p>
+          </div>
+
+          <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs">
+            <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Net Club Cash</p>
+            <p class="text-2xl font-extrabold ${netCash >= 0 ? 'text-forest-800' : 'text-rose-600'} mt-1">${formatUGX(netCash)}</p>
+            <p class="text-xs text-slate-500 mt-2">In: ${formatUGX(totalIncome)} • Out: ${formatUGX(totalExpense)}</p>
+          </div>
+
+          <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs">
+            <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Pending Kit & Fee Balances</p>
+            <p class="text-2xl font-extrabold text-amber-600 mt-1">${formatUGX(pendingBalances)}</p>
+            <p class="text-xs text-slate-500 mt-2">Kits: ${formatUGX(kitReceivables)} • Fees: ${formatUGX(feeReceivables)}</p>
+          </div>
+
+          <div class="bg-forest-900 text-white rounded-2xl p-5 border border-forest-800 shadow-xs">
+            <p class="text-xs font-bold uppercase tracking-wider text-limeclub">Next Fixture</p>
+            ${nextMatch ? `
+              <p class="text-lg font-extrabold mt-1 truncate">vs ${escapeHtml(nextMatch.opponent)}</p>
+              <p class="text-xs text-slate-300 mt-1">${escapeHtml(nextMatch.match_date)} • ${escapeHtml(nextMatch.kickoff_time)} (${escapeHtml(nextMatch.venue_type)})</p>
+              <p class="text-xs text-goldclub mt-1 truncate">${escapeHtml(nextMatch.venue_name)}</p>
+            ` : `
+              <p class="text-base font-bold mt-2">No Scheduled Fixtures</p>
+              <button onclick="switchTab('matches')" class="mt-2 text-xs text-limeclub underline">View Match Center</button>
+            `}
+          </div>
+        </div>
+
+        <!-- Admin Quick Actions (Hidden in View-Only Mode) -->
+        ${isAdmin ? `
+          <div class="bg-white rounded-2xl p-4 border border-emerald-200 flex flex-wrap items-center justify-between gap-3">
+            <span class="text-xs font-extrabold uppercase tracking-wider text-forest-800">Admin Quick Entry</span>
+            <div class="flex flex-wrap gap-2">
+              <button onclick="openPlayerModal()" class="px-3.5 py-2 rounded-xl bg-forest-800 hover:bg-forest-700 text-white text-xs font-bold">+ Register Player</button>
+              <button onclick="openTransactionModal()" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold">+ Record Receipt / Expense</button>
+              <button onclick="openMatchModal()" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold">+ Add Fixture / Match</button>
+              <button onclick="openSessionModal()" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold">+ New Training Session</button>
+            </div>
+          </div>
+        ` : ''}
+
+        <!-- Pinned Notices & Recent Transactions -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 space-y-4">
+            <div class="flex items-center justify-between">
+              <h3 class="font-bold text-slate-900">Pinned Club Announcements</h3>
+              <button onclick="switchTab('notices')" class="text-xs font-bold text-forest-800 hover:underline">View All (${db.notices.length})</button>
+            </div>
+            ${pinnedNotices.length ? pinnedNotices.map(n => `
+              <div class="p-4 rounded-xl bg-forest-900/5 border border-forest-800/15 space-y-1.5">
+                <div class="flex items-center justify-between gap-2">
+                  <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-forest-800 text-limeclub">${escapeHtml(n.category)}</span>
+                  <span class="text-xs text-slate-500">${escapeHtml(n.created_at)}</span>
+                </div>
+                <h4 class="font-bold text-sm text-slate-900">${escapeHtml(n.title)}</h4>
+                <p class="text-xs text-slate-600 leading-relaxed">${escapeHtml(n.body)}</p>
+                <p class="text-[11px] font-medium text-slate-500">— ${escapeHtml(n.author)}</p>
+              </div>
+            `).join('') : '<p class="text-sm text-slate-500">No pinned notices available.</p>'}
+          </div>
+
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 space-y-4">
+            <div class="flex items-center justify-between">
+              <h3 class="font-bold text-slate-900">Recent Financial Receipts & Expenses</h3>
+              <button onclick="switchTab('finance')" class="text-xs font-bold text-forest-800 hover:underline">Full Ledger</button>
+            </div>
+            ${recentTx.length ? `
+              <div class="divide-y divide-slate-100">
+                ${recentTx.map(tx => `
+                  <div class="py-3 flex items-center justify-between gap-3">
+                    <div class="min-w-0">
+                      <p class="text-sm font-semibold text-slate-900 truncate">${escapeHtml(tx.description)}</p>
+                      <p class="text-xs text-slate-500">${escapeHtml(tx.receipt_number)} • ${escapeHtml(tx.payer_name || getPlayerDisplay(tx.player_id))} • ${escapeHtml(tx.size_category || 'N/A')}</p>
+                    </div>
+                    <span class="text-sm font-bold shrink-0 ${tx.tx_type === 'Income' ? 'text-emerald-700' : 'text-rose-600'}">
+                      ${tx.tx_type === 'Income' ? '+' : '-'}${formatUGX(tx.amount_ugx)}
+                    </span>
+                  </div>
+                `).join('')}
+              </div>
+            ` : '<p class="text-sm text-slate-500">No transactions recorded yet.</p>'}
+          </div>
+        </div>
+      `;
+    }
+
+    // =========================================================================
+    // 2. PLAYERS & SQUAD MODULE (WITH JERSEY NAME COLUMN)
+    // =========================================================================
+    function renderPlayers() {
+      const q = uiFilters.playerSearch.toLowerCase();
+      const pos = uiFilters.playerPosition;
+      const filtered = db.players
+        .filter(p => (pos === 'All' || p.position === pos))
+        .filter(p =>
+          !q ||
+          p.full_name.toLowerCase().includes(q) ||
+          (p.jersey_name || '').toLowerCase().includes(q) ||
+          String(p.jersey_number).includes(q) ||
+          (p.phone || '').toLowerCase().includes(q)
+        )
+        .sort((a, b) => Number(a.jersey_number) - Number(b.jersey_number));
+
+      return `
+        <div class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div class="flex flex-wrap items-center gap-2.5 flex-1">
+            <input type="text" value="${escapeHtml(uiFilters.playerSearch)}"
+              oninput="uiFilters.playerSearch = this.value; renderApp();"
+              placeholder="Search player name, jersey name, #..."
+              class="px-3.5 py-2 rounded-xl border border-slate-300 text-sm w-full sm:w-72 focus:outline-none focus:ring-2 focus:ring-forest-700" />
+            <select onchange="uiFilters.playerPosition = this.value; renderApp();"
+              class="px-3.5 py-2 rounded-xl border border-slate-300 text-sm bg-white">
+              ${['All', 'Goalkeeper', 'Defender', 'Midfielder', 'Forward'].map(opt =>
+                `<option value="${opt}" ${pos === opt ? 'selected' : ''}>${opt === 'All' ? 'All Positions' : opt}</option>`
+              ).join('')}
+            </select>
+          </div>
+          ${isAdmin ? `
+            <button onclick="openPlayerModal()" class="px-4 py-2.5 rounded-xl bg-forest-800 hover:bg-forest-700 text-white text-sm font-bold shrink-0">
+              + Register New Player
+            </button>
+          ` : ''}
+        </div>
+
+        <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
+              <thead class="bg-slate-50 border-b border-slate-200 text-xs uppercase text-slate-500">
+                <tr>
+                  <th class="py-3.5 px-4">Jersey #</th>
+                  <th class="py-3.5 px-4">Jersey Name</th>
+                  <th class="py-3.5 px-4">Player Full Name</th>
+                  <th class="py-3.5 px-4">Position</th>
+                  <th class="py-3.5 px-4">Age / DOB</th>
+                  <th class="py-3.5 px-4">Contact</th>
+                  <th class="py-3.5 px-4">Status</th>
+                  <th class="py-3.5 px-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                ${filtered.length ? filtered.map(p => {
+                  const statusBadge = p.status === 'Active'
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    : p.status === 'Injured'
+                      ? 'bg-amber-50 text-amber-700 border-amber-200'
+                      : 'bg-rose-50 text-rose-700 border-rose-200';
+                  return `
+                    <tr class="hover:bg-slate-50/80">
+                      <td class="py-3.5 px-4 font-extrabold text-forest-900">#${escapeHtml(p.jersey_number)}</td>
+                      <td class="py-3.5 px-4">
+                        <span class="px-2.5 py-1 rounded-lg bg-forest-900 text-limeclub font-mono text-xs font-extrabold tracking-wider uppercase">
+                          ${escapeHtml(p.jersey_name || p.full_name.split(' ').pop().toUpperCase())}
+                        </span>
+                      </td>
+                      <td class="py-3.5 px-4">
+                        <p class="font-bold text-slate-900">${escapeHtml(p.full_name)}</p>
+                        <p class="text-xs text-slate-500">ID: ${escapeHtml(p.id)}</p>
+                      </td>
+                      <td class="py-3.5 px-4 font-medium text-slate-700">${escapeHtml(p.position)}</td>
+                      <td class="py-3.5 px-4 text-slate-600">${calculateAge(p.date_of_birth)} yrs <span class="text-xs text-slate-400">(${escapeHtml(p.date_of_birth)})</span></td>
+                      <td class="py-3.5 px-4 text-xs text-slate-600">${escapeHtml(p.phone || '—')}</td>
+                      <td class="py-3.5 px-4">
+                        <span class="px-2.5 py-1 rounded-full text-xs font-semibold border ${statusBadge}">${escapeHtml(p.status)}</span>
+                      </td>
+                      <td class="py-3.5 px-4 text-right space-x-1.5 whitespace-nowrap">
+                        <button onclick="openPlayerDossier('${p.id}')" class="px-2.5 py-1.5 rounded-lg bg-forest-900 text-limeclub text-xs font-semibold">Profile</button>
+                        ${isAdmin ? `<button onclick="openPlayerModal('${p.id}')" class="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold">Edit</button>` : ''}
+                      </td>
+                    </tr>
+                  `;
+                }).join('') : `<tr><td colspan="8" class="py-8 text-center text-slate-500">No players match your search filter.</td></tr>`}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    function openPlayerModal(playerId = null) {
+      if (!guardAdminAction()) return;
+      const p = playerId ? db.players.find(item => item.id === playerId) : null;
+      openModal(p ? `Edit Player — ${p.full_name}` : 'Register New Squad Player', `
+        <form onsubmit="savePlayerForm(event, '${p ? p.id : ''}')" class="space-y-4 text-sm">
+          <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+            <div class="sm:col-span-2">
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Full Name *</label>
+              <input name="full_name" required value="${escapeHtml(p?.full_name || '')}" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Jersey Name *</label>
+              <input name="jersey_name" required placeholder="e.g. MUGISHA" value="${escapeHtml(p?.jersey_name || '')}" class="w-full px-3 py-2 rounded-xl border border-slate-300 uppercase font-mono" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Jersey # *</label>
+              <input name="jersey_number" type="number" min="1" max="99" required value="${escapeHtml(p?.jersey_number || '')}" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+            </div>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Position *</label>
+              <select name="position" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white">
+                ${['Goalkeeper', 'Defender', 'Midfielder', 'Forward'].map(pos =>
+                  `<option value="${pos}" ${p?.position === pos ? 'selected' : ''}>${pos}</option>`
+                ).join('')}
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Date of Birth *</label>
+              <input name="date_of_birth" type="date" required value="${escapeHtml(p?.date_of_birth || '')}" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Squad Status</label>
+              <select name="status" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white">
+                ${['Active', 'Injured', 'Suspended', 'Inactive'].map(st =>
+                  `<option value="${st}" ${p?.status === st ? 'selected' : ''}>${st}</option>`
+                ).join('')}
+              </select>
+            </div>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Phone Number</label>
+              <input name="phone" value="${escapeHtml(p?.phone || '+256 ')}" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">National ID (NIN)</label>
+              <input name="national_id" value="${escapeHtml(p?.national_id || '')}" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+            </div>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Guardian / Next of Kin</label>
+              <input name="guardian_contact" value="${escapeHtml(p?.guardian_contact || '')}" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Joined Date</label>
+              <input name="joined_date" type="date" value="${escapeHtml(p?.joined_date || new Date().toISOString().slice(0, 10))}" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Medical & Fitness Notes</label>
+            <input name="medical_notes" value="${escapeHtml(p?.medical_notes || 'Fit & Cleared')}" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+          </div>
+          <div class="flex justify-end gap-2 pt-2">
+            <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 font-semibold">Cancel</button>
+            <button type="submit" class="px-5 py-2 rounded-xl bg-forest-800 text-white font-bold">Save Player Record</button>
+          </div>
+        </form>
+      `);
+    }
+
+    function savePlayerForm(e, existingId) {
+      e.preventDefault();
+      if (!guardAdminAction()) return;
+      const fd = new FormData(e.target);
+      const jersey = Number(fd.get('jersey_number'));
+      const dup = db.players.find(pl => Number(pl.jersey_number) === jersey && pl.id !== existingId);
+      if (dup) {
+        showToast(`Jersey #${jersey} is already assigned to ${dup.full_name}.`, true);
+        return;
+      }
+      const record = {
+        id: existingId || nextId('PL', db.players, 3),
+        full_name: fd.get('full_name').trim(),
+        jersey_name: fd.get('jersey_name').trim().toUpperCase(),
+        jersey_number: jersey,
+        position: fd.get('position'),
+        date_of_birth: fd.get('date_of_birth'),
+        phone: fd.get('phone').trim(),
+        guardian_contact: fd.get('guardian_contact').trim(),
+        national_id: fd.get('national_id').trim(),
+        medical_notes: fd.get('medical_notes').trim() || 'Fit & Cleared',
+        status: fd.get('status'),
+        joined_date: fd.get('joined_date')
+      };
+      if (existingId) {
+        const idx = db.players.findIndex(pl => pl.id === existingId);
+        db.players[idx] = record;
+      } else {
+        db.players.push(record);
+      }
+      saveDatabase();
+      closeModal();
+      renderApp();
+      showToast(`${record.full_name} (${record.jersey_name} #${record.jersey_number}) saved.`);
+    }
+
+    function openPlayerDossier(playerId) {
+      const p = getPlayer(playerId);
+      if (!p) return;
+      const fees = db.membership_fees.filter(f => f.player_id === playerId);
+      const txs = db.transactions.filter(t => t.player_id === playerId);
+      const att = db.attendance_records.filter(a => a.player_id === playerId);
+      const presentCount = att.filter(a => a.status === 'Present' || a.status === 'Late').length;
+      const attRate = att.length ? Math.round((presentCount / att.length) * 100) : 0;
+
+      openModal(`Player Profile — ${p.jersey_name} (#${p.jersey_number})`, `
+        <div class="space-y-4 text-sm">
+          <div class="p-4 rounded-xl bg-forest-900 text-white flex items-center justify-between gap-3">
+            <div>
+              <p class="text-xs text-limeclub uppercase font-bold">${escapeHtml(p.position)} • ${escapeHtml(p.status)}</p>
+              <h4 class="text-lg font-extrabold">${escapeHtml(p.full_name)}</h4>
+              <p class="text-xs text-goldclub font-mono font-bold mt-0.5">Jersey Print: ${escapeHtml(p.jersey_name)} (#${p.jersey_number})</p>
+              <p class="text-xs text-slate-300 mt-0.5">Age ${calculateAge(p.date_of_birth)} (${escapeHtml(p.date_of_birth)}) • Joined ${escapeHtml(p.joined_date)}</p>
+            </div>
+            <div class="text-right shrink-0">
+              <span class="text-3xl font-black text-goldclub">#${p.jersey_number}</span>
+              <p class="text-xs text-limeclub mt-1">Attendance: ${attRate}% (${presentCount}/${att.length})</p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3 text-xs bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+            <div><span class="text-slate-500 block">Phone:</span><strong>${escapeHtml(p.phone || '—')}</strong></div>
+            <div><span class="text-slate-500 block">National ID:</span><strong>${escapeHtml(p.national_id || '—')}</strong></div>
+            <div class="col-span-2"><span class="text-slate-500 block">Guardian / Next of Kin:</span><strong>${escapeHtml(p.guardian_contact || '—')}</strong></div>
+            <div class="col-span-2"><span class="text-slate-500 block">Medical Notes:</span><strong>${escapeHtml(p.medical_notes || 'Fit & Cleared')}</strong></div>
+          </div>
+
+          <div>
+            <h5 class="font-bold text-xs uppercase text-slate-500 mb-1.5">Membership Fees (${fees.length})</h5>
+            ${fees.length ? fees.map(f => `
+              <div class="p-2.5 rounded-lg border border-slate-200 flex justify-between text-xs mb-1.5">
+                <span>${escapeHtml(f.period_label)} — ${escapeHtml(f.fee_type)}</span>
+                <span class="font-bold">${formatUGX(f.amount_paid_ugx)} / ${formatUGX(f.amount_due_ugx)} (${escapeHtml(f.status)})</span>
+              </div>
+            `).join('') : '<p class="text-xs text-slate-400">No fee records.</p>'}
+          </div>
+
+          <div>
+            <h5 class="font-bold text-xs uppercase text-slate-500 mb-1.5">Receipts & Payments (${txs.length})</h5>
+            ${txs.length ? txs.map(t => `
+              <div class="p-2.5 rounded-lg border border-slate-200 flex justify-between text-xs mb-1.5">
+                <span>${escapeHtml(t.receipt_number)} • ${escapeHtml(t.description)} (${escapeHtml(t.size_category || 'N/A')})</span>
+                <span class="font-bold text-emerald-700">${formatUGX(t.amount_ugx)}</span>
+              </div>
+            `).join('') : '<p class="text-xs text-slate-400">No linked receipts.</p>'}
+          </div>
+        </div>
+      `);
+    }
+
+    // =========================================================================
+    // 3. UNIFORMS & ORDERS MODULE
+    // =========================================================================
+    function renderUniforms() {
+      return `
+        <div class="bg-white rounded-2xl border border-slate-200 p-5 space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 class="font-bold text-slate-900">Club Kit & Uniform Stock (Player & Fan Editions)</h3>
+              <p class="text-xs text-slate-500">Available matchday and supporter jersey inventory.</p>
+            </div>
+            ${isAdmin ? `
+              <div class="flex gap-2">
+                <button onclick="openStockModal()" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold">+ Add Stock Item</button>
+                <button onclick="openOrderModal()" class="px-4 py-2 rounded-xl bg-forest-800 hover:bg-forest-700 text-white text-xs font-bold">+ New Kit Order</button>
+              </div>
+            ` : ''}
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            ${db.uniform_stock.map(s => `
+              <div class="p-4 rounded-xl border border-slate-200 bg-slate-50/70 flex flex-col justify-between gap-2">
+                <div>
+                  <div class="flex items-center justify-between gap-2">
+                    <span class="px-2 py-0.5 rounded-md text-[11px] font-bold bg-forest-900 text-limeclub">${escapeHtml(s.size_category || 'Player')}</span>
+                    <span class="text-xs font-bold text-slate-600">Size: ${escapeHtml(s.size)}</span>
+                  </div>
+                  <p class="font-bold text-sm text-slate-900 mt-2">${escapeHtml(s.item_name)}</p>
+                  <p class="text-xs font-semibold text-forest-800 mt-0.5">${formatUGX(s.unit_price_ugx)}</p>
+                </div>
+                <div class="flex items-center justify-between pt-2 border-t border-slate-200 text-xs">
+                  <span class="${Number(s.quantity_available) <= 5 ? 'text-rose-600 font-bold' : 'text-slate-600 font-semibold'}">
+                    In Stock: ${s.quantity_available}
+                  </span>
+                  ${isAdmin ? `<button onclick="restockItem('${s.id}')" class="text-forest-800 font-bold hover:underline">+5 Restock</button>` : '<span class="text-slate-400">Available</span>'}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+
+        <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+          <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
+            <h3 class="font-bold text-slate-900">Kit Orders (${db.uniform_orders.length})</h3>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
+              <thead class="bg-slate-50 border-b border-slate-200 text-xs uppercase text-slate-500">
+                <tr>
+                  <th class="py-3 px-4">Order ID</th>
+                  <th class="py-3 px-4">Player / Buyer</th>
+                  <th class="py-3 px-4">Jersey Name</th>
+                  <th class="py-3 px-4">Jersey #</th>
+                  <th class="py-3 px-4">Size Category</th>
+                  <th class="py-3 px-4">Paid / Total</th>
+                  <th class="py-3 px-4">Status</th>
+                  ${isAdmin ? '<th class="py-3 px-4 text-right">Actions</th>' : ''}
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                ${db.uniform_orders.map(o => {
+                  const bal = Math.max(0, Number(o.total_amount_ugx) - Number(o.amount_paid_ugx));
+                  return `
+                    <tr class="hover:bg-slate-50">
+                      <td class="py-3 px-4 font-mono text-xs font-bold">${escapeHtml(o.id)}</td>
+                      <td class="py-3 px-4 font-semibold">${escapeHtml(getPlayerDisplay(o.player_id))}</td>
+                      <td class="py-3 px-4 font-mono text-xs font-bold text-forest-900">${escapeHtml(o.jersey_name || '—')}</td>
+                      <td class="py-3 px-4 font-bold">#${escapeHtml(o.jersey_number || '—')}</td>
+                      <td class="py-3 px-4 text-xs font-semibold">${escapeHtml(o.size_category || 'Player')}</td>
+                      <td class="py-3 px-4 text-xs">
+                        <span class="font-bold text-emerald-700">${formatUGX(o.amount_paid_ugx)}</span> / ${formatUGX(o.total_amount_ugx)}
+                        <span class="block ${bal > 0 ? 'text-amber-600 font-semibold' : 'text-slate-400'}">Bal: ${formatUGX(bal)}</span>
+                      </td>
+                      <td class="py-3 px-4">
+                        <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                          o.delivery_status === 'Delivered' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+                        }">${escapeHtml(o.delivery_status)}</span>
+                      </td>
+                      ${isAdmin ? `
+                        <td class="py-3 px-4 text-right space-x-1 whitespace-nowrap">
+                          ${bal > 0 ? `<button onclick="clearUniformBalance('${o.id}')" class="px-2.5 py-1 rounded-lg bg-forest-800 text-white text-xs font-semibold">Clear Bal</button>` : ''}
+                          ${o.delivery_status === 'Pending' ? `<button onclick="markOrderDelivered('${o.id}')" class="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 text-xs font-semibold">Deliver</button>` : ''}
+                        </td>
+                      ` : ''}
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    function restockItem(stockId) {
+      if (!guardAdminAction()) return;
+      const item = getStockItem(stockId);
+      if (!item) return;
+      item.quantity_available = Number(item.quantity_available) + 5;
+      saveDatabase();
+      renderApp();
+      showToast(`Added +5 units to ${item.item_name} (${item.size}).`);
+    }
+
+    function openStockModal() {
+      if (!guardAdminAction()) return;
+      openModal('Add Uniform Stock Item', `
+        <form onsubmit="saveStockForm(event)" class="space-y-4 text-sm">
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Item Name *</label>
+            <input name="item_name" required placeholder="e.g. Away Kit (White/Gold)" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+          </div>
+          <div class="grid grid-cols-3 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Size Category</label>
+              <select name="size_category" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white">
+                <option value="Player">Player</option>
+                <option value="Fan">Fan</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Size</label>
+              <select name="size" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white">
+                ${['XS', 'S', 'M', 'L', 'XL', 'XXL'].map(sz => `<option value="${sz}">${sz}</option>`).join('')}
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Unit Price (UGX) *</label>
+              <input name="unit_price_ugx" type="number" min="0" step="500" required class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Quantity Available *</label>
+            <input name="quantity_available" type="number" min="0" required class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+          </div>
+          <div class="flex justify-end gap-2 pt-2">
+            <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-xl bg-slate-100 font-semibold">Cancel</button>
+            <button type="submit" class="px-5 py-2 rounded-xl bg-forest-800 text-white font-bold">Add Stock</button>
+          </div>
+        </form>
+      `);
+    }
+
+    function saveStockForm(e) {
+      e.preventDefault();
+      if (!guardAdminAction()) return;
+      const fd = new FormData(e.target);
+      db.uniform_stock.push({
+        id: nextId('STK', db.uniform_stock, 2),
+        item_name: fd.get('item_name').trim(),
+        kit_type: fd.get('size_category') === 'Fan' ? 'Fan Jersey' : 'Match Kit',
+        size_category: fd.get('size_category'),
+        size: fd.get('size'),
+        unit_price_ugx: Number(fd.get('unit_price_ugx')),
+        quantity_available: Number(fd.get('quantity_available'))
+      });
+      saveDatabase();
+      closeModal();
+      renderApp();
+      showToast('Uniform stock item added.');
+    }
+
+    function openOrderModal() {
+      if (!guardAdminAction()) return;
+      openModal('New Kit Order (Player / Fan)', `
+        <form onsubmit="saveOrderForm(event)" class="space-y-4 text-sm">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Linked Squad Player</label>
+              <select name="player_id" onchange="syncOrderPlayerFields(this)" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white">
+                <option value="">— External Fan / Supporter —</option>
+                ${db.players.map(p => `<option value="${p.id}" data-jname="${escapeHtml(p.jersey_name)}" data-jno="${p.jersey_number}">#${p.jersey_number} ${escapeHtml(p.full_name)}</option>`).join('')}
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Select Kit Stock *</label>
+              <select name="stock_id" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white">
+                ${db.uniform_stock.map(s => `<option value="${s.id}">${escapeHtml(s.item_name)} (${s.size_category} - ${s.size}) — ${formatUGX(s.unit_price_ugx)} [${s.quantity_available} left]</option>`).join('')}
+              </select>
+            </div>
+          </div>
+          <div class="grid grid-cols-3 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Jersey Name *</label>
+              <input id="ordJerseyName" name="jersey_name" required placeholder="e.g. MUGISHA" class="w-full px-3 py-2 rounded-xl border border-slate-300 uppercase font-mono" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Jersey No. *</label>
+              <input id="ordJerseyNo" name="jersey_number" type="number" min="0" max="99" required placeholder="10" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Size Category *</label>
+              <select name="size_category" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white">
+                <option value="Player - M">Player - M</option>
+                <option value="Player - L" selected>Player - L</option>
+                <option value="Player - XL">Player - XL</option>
+                <option value="Fan - M">Fan - M</option>
+                <option value="Fan - L">Fan - L</option>
+                <option value="Fan - XL">Fan - XL</option>
+              </select>
+            </div>
+          </div>
+          <div class="grid grid-cols-3 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Quantity *</label>
+              <input name="quantity" type="number" min="1" value="1" required class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Amount Paid (UGX)</label>
+              <input name="amount_paid_ugx" type="number" min="0" step="500" value="0" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Method</label>
+              <select name="payment_method" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white">
+                ${['Cash', 'MTN MoMo', 'Airtel Money', 'Bank Transfer'].map(m => `<option value="${m}">${m}</option>`).join('')}
+              </select>
+            </div>
+          </div>
+          <div class="flex justify-end gap-2 pt-2">
+            <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-xl bg-slate-100 font-semibold">Cancel</button>
+            <button type="submit" class="px-5 py-2 rounded-xl bg-forest-800 text-white font-bold">Submit Kit Order</button>
+          </div>
+        </form>
+      `);
+    }
+
+    function syncOrderPlayerFields(sel) {
+      const opt = sel.options[sel.selectedIndex];
+      const jn = opt?.getAttribute('data-jname') || '';
+      const no = opt?.getAttribute('data-jno') || '';
+      document.getElementById('ordJerseyName').value = jn;
+      document.getElementById('ordJerseyNo').value = no;
+    }
+
+    function saveOrderForm(e) {
+      e.preventDefault();
+      if (!guardAdminAction()) return;
+      const fd = new FormData(e.target);
+      const stock = getStockItem(fd.get('stock_id'));
+      const qty = Number(fd.get('quantity'));
+      if (!stock || Number(stock.quantity_available) < qty) {
+        showToast('Insufficient stock available for this item.', true);
+        return;
+      }
+      const total = Number(stock.unit_price_ugx) * qty;
+      const paid = Math.min(total, Number(fd.get('amount_paid_ugx')) || 0);
+      const playerId = fd.get('player_id') || null;
+      const jName = fd.get('jersey_name').trim().toUpperCase();
+      const jNo = fd.get('jersey_number').trim();
+      const sizeCat = fd.get('size_category');
+      const today = new Date().toISOString().slice(0, 10);
+
+      stock.quantity_available = Number(stock.quantity_available) - qty;
+      const orderId = nextId('ORD', db.uniform_orders, 3);
+      db.uniform_orders.push({
+        id: orderId,
+        player_id: playerId,
+        jersey_name: jName,
+        jersey_number: jNo,
+        size_category: sizeCat,
+        stock_id: stock.id,
+        quantity: qty,
+        total_amount_ugx: total,
+        amount_paid_ugx: paid,
+        payment_status: paid === 0 ? 'Unpaid' : paid >= total ? 'Paid' : 'Partial',
+        delivery_status: 'Delivered',
+        order_date: today
+      });
+
+      if (paid > 0) {
+        db.transactions.push({
+          id: nextId('TX', db.transactions, 3),
+          receipt_number: nextReceiptNumber(),
+          tx_type: 'Income',
+          category: sizeCat.startsWith('Fan') ? 'Fan Jersey Sale' : 'Uniform Payment',
+          description: `${stock.item_name} (${orderId})`,
+          player_id: playerId,
+          payer_name: playerId ? getPlayer(playerId)?.full_name : `${jName} (Supporter)`,
+          jersey_name: jName,
+          jersey_number: jNo,
+          size_category: sizeCat,
+          amount_ugx: paid,
+          payment_method: fd.get('payment_method'),
+          tx_date: today,
+          recorded_by: 'Club Admin'
+        });
+      }
+
+      saveDatabase();
+      closeModal();
+      renderApp();
+      showToast(`Kit order ${orderId} saved.`);
+    }
+
+    function clearUniformBalance(orderId) {
+      if (!guardAdminAction()) return;
+      const ord = db.uniform_orders.find(o => o.id === orderId);
+      if (!ord) return;
+      const bal = Math.max(0, Number(ord.total_amount_ugx) - Number(ord.amount_paid_ugx));
+      if (bal <= 0) return;
+      ord.amount_paid_ugx = Number(ord.total_amount_ugx);
+      ord.payment_status = 'Paid';
+
+      db.transactions.push({
+        id: nextId('TX', db.transactions, 3),
+        receipt_number: nextReceiptNumber(),
+        tx_type: 'Income',
+        category: 'Uniform Payment',
+        description: `Kit Balance Clearance (${ord.id})`,
+        player_id: ord.player_id,
+        payer_name: ord.player_id ? getPlayer(ord.player_id)?.full_name : ord.jersey_name,
+        jersey_name: ord.jersey_name || 'N/A',
+        jersey_number: String(ord.jersey_number || 'N/A'),
+        size_category: ord.size_category || 'Player',
+        amount_ugx: bal,
+        payment_method: 'Cash',
+        tx_date: new Date().toISOString().slice(0, 10),
+        recorded_by: 'Club Admin'
+      });
+
+      saveDatabase();
+      renderApp();
+      showToast(`Balance of ${formatUGX(bal)} cleared & receipt issued.`);
+    }
+
+    function markOrderDelivered(orderId) {
+      if (!guardAdminAction()) return;
+      const ord = db.uniform_orders.find(o => o.id === orderId);
+      if (!ord) return;
+      ord.delivery_status = 'Delivered';
+      saveDatabase();
+      renderApp();
+    }
+
+    // =========================================================================
+    // 4. PAYMENTS & EXPENSES MODULE (WITH JERSEY NAME, JERSEY NO., SIZE CATEGORY)
+    // =========================================================================
+    function renderFinance() {
+      const list = db.transactions
+        .filter(t => uiFilters.txType === 'All' || t.tx_type === uiFilters.txType)
+        .sort((a, b) => b.tx_date.localeCompare(a.tx_date));
+
+      return `
+        <div class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 flex flex-wrap items-center justify-between gap-3">
+          <div class="flex gap-2">
+            ${['All', 'Income', 'Expense'].map(type => `
+              <button onclick="uiFilters.txType = '${type}'; renderApp();"
+                class="px-3.5 py-2 rounded-xl text-xs font-bold transition ${
+                  uiFilters.txType === type ? 'bg-forest-900 text-limeclub' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }">${type}</button>
+            `).join('')}
+          </div>
+          ${isAdmin ? `
+            <button onclick="openTransactionModal()" class="px-4 py-2.5 rounded-xl bg-forest-800 hover:bg-forest-700 text-white text-xs font-bold">
+              + Record Receipt / Expense
+            </button>
+          ` : ''}
+        </div>
+
+        <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
+              <thead class="bg-slate-50 border-b border-slate-200 text-xs uppercase text-slate-500">
+                <tr>
+                  <th class="py-3 px-4">Receipt #</th>
+                  <th class="py-3 px-4">Date</th>
+                  <th class="py-3 px-4">Category & Description</th>
+                  <th class="py-3 px-4">Player / Payer</th>
+                  <th class="py-3 px-4">Jersey Name</th>
+                  <th class="py-3 px-4">Jersey No.</th>
+                  <th class="py-3 px-4">Size Category (Player/Fan)</th>
+                  <th class="py-3 px-4">Method</th>
+                  <th class="py-3 px-4 text-right">Amount</th>
+                  <th class="py-3 px-4 text-right">Receipt</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                ${list.map(t => {
+                  const p = getPlayer(t.player_id);
+                  const jName = t.jersey_name || p?.jersey_name || 'N/A';
+                  const jNo = t.jersey_number || (p ? String(p.jersey_number) : 'N/A');
+                  const sizeCat = t.size_category || 'N/A';
+                  const isFan = sizeCat.toLowerCase().startsWith('fan');
+                  const isPlayer = sizeCat.toLowerCase().startsWith('player');
+                  return `
+                    <tr class="hover:bg-slate-50">
+                      <td class="py-3 px-4 font-mono text-xs font-bold text-slate-700 whitespace-nowrap">${escapeHtml(t.receipt_number)}</td>
+                      <td class="py-3 px-4 text-xs text-slate-600 whitespace-nowrap">${escapeHtml(t.tx_date)}</td>
+                      <td class="py-3 px-4">
+                        <span class="text-[11px] font-bold uppercase text-slate-500">${escapeHtml(t.category)}</span>
+                        <p class="font-semibold text-slate-900">${escapeHtml(t.description)}</p>
+                      </td>
+                      <td class="py-3 px-4 text-xs font-semibold text-slate-700">${escapeHtml(t.payer_name || getPlayerDisplay(t.player_id))}</td>
+                      <td class="py-3 px-4">
+                        ${jName !== 'N/A'
+                          ? `<span class="px-2 py-0.5 rounded bg-forest-900 text-limeclub font-mono text-xs font-bold">${escapeHtml(jName)}</span>`
+                          : '<span class="text-xs text-slate-400">N/A</span>'}
+                      </td>
+                      <td class="py-3 px-4 font-bold text-xs text-forest-900">${jNo !== 'N/A' ? `#${escapeHtml(jNo)}` : '<span class="text-slate-400 font-normal">N/A</span>'}</td>
+                      <td class="py-3 px-4 whitespace-nowrap">
+                        <span class="px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                          isFan ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                          : isPlayer ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                          : 'bg-slate-100 text-slate-500'
+                        }">${escapeHtml(sizeCat)}</span>
+                      </td>
+                      <td class="py-3 px-4 text-xs whitespace-nowrap">${escapeHtml(t.payment_method)}</td>
+                      <td class="py-3 px-4 text-right font-bold whitespace-nowrap ${t.tx_type === 'Income' ? 'text-emerald-700' : 'text-rose-600'}">
+                        ${t.tx_type === 'Income' ? '+' : '-'}${formatUGX(t.amount_ugx)}
+                      </td>
+                      <td class="py-3 px-4 text-right">
+                        <button onclick="openReceiptModal('${t.id}')" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs font-semibold">View</button>
+                      </td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    function openTransactionModal() {
+      if (!guardAdminAction()) return;
+      openModal('Record Financial Receipt or Expense', `
+        <form onsubmit="saveTransactionForm(event)" class="space-y-4 text-sm">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Transaction Type *</label>
+              <select name="tx_type" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white">
+                <option value="Income">Income (Official Receipt)</option>
+                <option value="Expense">Expense (Club Outflow)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Category *</label>
+              <input name="category" required placeholder="e.g. Uniform Payment, Fan Jersey, Match Referees" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Description *</label>
+            <input name="description" required placeholder="Purpose of payment or expenditure" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Linked Squad Player (Optional)</label>
+              <select name="player_id" onchange="syncTxPlayerFields(this)" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white">
+                <option value="">— External Fan / Sponsor / Vendor —</option>
+                ${db.players.map(p => `<option value="${p.id}" data-fullname="${escapeHtml(p.full_name)}" data-jname="${escapeHtml(p.jersey_name)}" data-jno="${p.jersey_number}">#${p.jersey_number} ${escapeHtml(p.full_name)}</option>`).join('')}
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Payer / Recipient Name *</label>
+              <input id="txPayerName" name="payer_name" required placeholder="Full name of payer or vendor" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+            </div>
+          </div>
+
+          <!-- Jersey Name, Jersey No., and Size Category (Player / Fan) -->
+          <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">Jersey Name</label>
+              <input id="txJerseyName" name="jersey_name" placeholder="e.g. KATO or N/A" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white uppercase font-mono text-xs" />
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">Jersey No.</label>
+              <input id="txJerseyNo" name="jersey_number" placeholder="e.g. 4 or N/A" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white text-xs" />
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">Size Category (Player/Fan)</label>
+              <select name="size_category" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white text-xs font-semibold">
+                <option value="N/A">N/A (Non-Kit)</option>
+                <option value="Player - S">Player - S</option>
+                <option value="Player - M">Player - M</option>
+                <option value="Player - L">Player - L</option>
+                <option value="Player - XL">Player - XL</option>
+                <option value="Fan - S">Fan - S</option>
+                <option value="Fan - M">Fan - M</option>
+                <option value="Fan - L">Fan - L</option>
+                <option value="Fan - XL">Fan - XL</option>
+                <option value="Fan - XXL">Fan - XXL</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-3 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Amount (UGX) *</label>
+              <input name="amount_ugx" type="number" min="500" step="500" required class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Payment Method</label>
+              <select name="payment_method" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white">
+                ${['Cash', 'MTN MoMo', 'Airtel Money', 'Bank Transfer'].map(m => `<option value="${m}">${m}</option>`).join('')}
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Date *</label>
+              <input name="tx_date" type="date" required value="${new Date().toISOString().slice(0, 10)}" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+            </div>
+          </div>
+          <div class="flex justify-end gap-2 pt-2">
+            <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-xl bg-slate-100 font-semibold">Cancel</button>
+            <button type="submit" class="px-5 py-2 rounded-xl bg-forest-800 text-white font-bold">Save & Generate Receipt</button>
+          </div>
+        </form>
+      `);
+    }
+
+    function syncTxPlayerFields(sel) {
+      const opt = sel.options[sel.selectedIndex];
+      if (!opt || !opt.value) return;
+      document.getElementById('txPayerName').value = opt.getAttribute('data-fullname') || '';
+      document.getElementById('txJerseyName').value = opt.getAttribute('data-jname') || '';
+      document.getElementById('txJerseyNo').value = opt.getAttribute('data-jno') || '';
+    }
+
+    function saveTransactionForm(e) {
+      e.preventDefault();
+      if (!guardAdminAction()) return;
+      const fd = new FormData(e.target);
+      const rct = nextReceiptNumber();
+      db.transactions.push({
+        id: nextId('TX', db.transactions, 3),
+        receipt_number: rct,
+        tx_type: fd.get('tx_type'),
+        category: fd.get('category').trim(),
+        description: fd.get('description').trim(),
+        player_id: fd.get('player_id') || null,
+        payer_name: fd.get('payer_name').trim(),
+        jersey_name: (fd.get('jersey_name').trim() || 'N/A').toUpperCase(),
+        jersey_number: fd.get('jersey_number').trim() || 'N/A',
+        size_category: fd.get('size_category') || 'N/A',
+        amount_ugx: Number(fd.get('amount_ugx')),
+        payment_method: fd.get('payment_method'),
+        tx_date: fd.get('tx_date'),
+        recorded_by: 'Club Admin'
+      });
+      saveDatabase();
+      closeModal();
+      renderApp();
+      showToast(`Receipt ${rct} recorded.`);
+    }
+
+    function openReceiptModal(txId) {
+      const t = db.transactions.find(item => item.id === txId);
+      if (!t) return;
+      const p = getPlayer(t.player_id);
+      const jName = t.jersey_name || p?.jersey_name || 'N/A';
+      const jNo = t.jersey_number || (p ? String(p.jersey_number) : 'N/A');
+      const sizeCat = t.size_category || 'N/A';
+
+      openModal(`Official Receipt — ${t.receipt_number}`, `
+        <div class="border-2 border-forest-900 rounded-2xl p-6 space-y-4 bg-white">
+          <div class="flex items-center justify-between border-b border-slate-200 pb-4 gap-3">
+            <div class="flex items-center gap-3">
+              <div class="w-14 h-14 rounded-xl bg-white border border-slate-200 p-0.5 overflow-hidden shrink-0">${renderCrestHtml()}</div>
+              <div>
+                <h4 class="font-extrabold text-lg text-forest-900">${escapeHtml(db.club_settings.club_name)}</h4>
+                <p class="text-xs text-slate-500">${escapeHtml(db.club_settings.nickname)} • ${escapeHtml(db.club_settings.home_ground)}</p>
+              </div>
+            </div>
+            <div class="text-right">
+              <span class="px-2.5 py-1 rounded-md text-xs font-bold bg-forest-900 text-limeclub">OFFICIAL ${t.tx_type.toUpperCase()}</span>
+              <p class="font-mono text-xs font-bold mt-1">${escapeHtml(t.receipt_number)}</p>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+            <div><span class="text-slate-500 block">Date:</span><strong>${escapeHtml(t.tx_date)}</strong></div>
+            <div><span class="text-slate-500 block">Payment Method:</span><strong>${escapeHtml(t.payment_method)}</strong></div>
+            <div><span class="text-slate-500 block">Category:</span><strong>${escapeHtml(t.category)}</strong></div>
+            <div><span class="text-slate-500 block">Player / Payer:</span><strong>${escapeHtml(t.payer_name || getPlayerDisplay(t.player_id))}</strong></div>
+            <div><span class="text-slate-500 block">Jersey Name & No.:</span><strong>${escapeHtml(jName)} (${jNo !== 'N/A' ? '#' + escapeHtml(jNo) : 'N/A'})</strong></div>
+            <div><span class="text-slate-500 block">Size Category:</span><strong>${escapeHtml(sizeCat)}</strong></div>
+            <div class="col-span-2 sm:col-span-3"><span class="text-slate-500 block">Description:</span><strong>${escapeHtml(t.description)}</strong></div>
+          </div>
+          <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
+            <span class="text-xs font-bold uppercase text-slate-500">Total Amount</span>
+            <span class="text-xl font-black text-forest-900">${formatUGX(t.amount_ugx)}</span>
+          </div>
+          <div class="flex items-center justify-between text-xs text-slate-500 pt-2">
+            <span>Authorized by: <strong>${escapeHtml(t.recorded_by)}</strong></span>
+            <button onclick="printReceipt('${t.id}')" class="px-4 py-2 rounded-xl bg-forest-800 text-white font-bold">Print Receipt</button>
+          </div>
+        </div>
+      `);
+    }
+
+    function printReceipt(txId) {
+      const t = db.transactions.find(item => item.id === txId);
+      if (!t) return;
+      const p = getPlayer(t.player_id);
+      const jName = t.jersey_name || p?.jersey_name || 'N/A';
+      const jNo = t.jersey_number || (p ? String(p.jersey_number) : 'N/A');
+      const area = document.getElementById('print-area');
+      area.innerHTML = `
+        <div style="max-width:500px;margin:0 auto;border:2px solid #102b1c;padding:24px;font-family:Inter,sans-serif;">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+            <img src="${escapeHtml(getLogoSrc())}" style="width:54px;height:54px;object-fit:contain;" onerror="this.style.display='none'" />
+            <div>
+              <h2 style="margin:0;color:#102b1c;">${escapeHtml(db.club_settings.club_name)}</h2>
+              <p style="margin:2px 0 0;font-size:12px;color:#475569;">${escapeHtml(db.club_settings.home_ground)} • ${escapeHtml(t.receipt_number)}</p>
+            </div>
+          </div>
+          <hr/>
+          <p><strong>Date:</strong> ${escapeHtml(t.tx_date)} &nbsp;|&nbsp; <strong>Method:</strong> ${escapeHtml(t.payment_method)}</p>
+          <p><strong>Player / Payer:</strong> ${escapeHtml(t.payer_name || getPlayerDisplay(t.player_id))}</p>
+          <p><strong>Jersey Name:</strong> ${escapeHtml(jName)} &nbsp;|&nbsp; <strong>Jersey No.:</strong> ${jNo !== 'N/A' ? '#' + escapeHtml(jNo) : 'N/A'}</p>
+          <p><strong>Size Category (Player/Fan):</strong> ${escapeHtml(t.size_category || 'N/A')}</p>
+          <p><strong>Description:</strong> ${escapeHtml(t.description)}</p>
+          <h3 style="margin-top:16px;padding:10px;background:#f1f5f9;">Total Paid: ${formatUGX(t.amount_ugx)}</h3>
+          <p style="font-size:12px;color:#64748b;margin-top:20px;">Authorized by: ${escapeHtml(t.recorded_by)}</p>
+        </div>
+      `;
+      area.classList.remove('hidden');
+      window.print();
+      area.classList.add('hidden');
+    }
+
+    // =========================================================================
+    // 5. MEMBERSHIP FEES MODULE (WITH JERSEY NAME & JERSEY NUMBER COLUMNS)
+    // =========================================================================
+    function renderFees() {
+      const list = db.membership_fees.filter(f => uiFilters.feeStatus === 'All' || f.status === uiFilters.feeStatus);
+      return `
+        <div class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 flex flex-wrap items-center justify-between gap-3">
+          <div class="flex flex-wrap gap-2">
+            ${['All', 'Paid', 'Partial', 'Overdue', 'Pending'].map(st => `
+              <button onclick="uiFilters.feeStatus = '${st}'; renderApp();"
+                class="px-3 py-1.5 rounded-xl text-xs font-bold ${
+                  uiFilters.feeStatus === st ? 'bg-forest-900 text-limeclub' : 'bg-slate-100 text-slate-700'
+                }">${st}</button>
+            `).join('')}
+          </div>
+          ${isAdmin ? `
+            <button onclick="openBulkFeeModal()" class="px-4 py-2.5 rounded-xl bg-forest-800 hover:bg-forest-700 text-white text-xs font-bold">
+              + Assign Monthly Fee to Squad
+            </button>
+          ` : ''}
+        </div>
+
+        <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
+              <thead class="bg-slate-50 border-b border-slate-200 text-xs uppercase text-slate-500">
+                <tr>
+                  <th class="py-3 px-4">Jersey #</th>
+                  <th class="py-3 px-4">Jersey Name</th>
+                  <th class="py-3 px-4">Player Full Name</th>
+                  <th class="py-3 px-4">Period & Type</th>
+                  <th class="py-3 px-4">Due Date</th>
+                  <th class="py-3 px-4">Paid / Due</th>
+                  <th class="py-3 px-4">Status</th>
+                  ${isAdmin ? '<th class="py-3 px-4 text-right">Action</th>' : ''}
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                ${list.map(f => {
+                  const p = getPlayer(f.player_id);
+                  const bal = Math.max(0, Number(f.amount_due_ugx) - Number(f.amount_paid_ugx));
+                  const badge = f.status === 'Paid' ? 'bg-emerald-50 text-emerald-700'
+                    : f.status === 'Overdue' ? 'bg-rose-50 text-rose-700' : 'bg-amber-50 text-amber-700';
+                  return `
+                    <tr class="hover:bg-slate-50">
+                      <td class="py-3 px-4 font-extrabold text-forest-900">${p ? `#${p.jersey_number}` : '—'}</td>
+                      <td class="py-3 px-4">
+                        <span class="px-2 py-0.5 rounded bg-forest-900 text-limeclub font-mono text-xs font-bold">
+                          ${escapeHtml(p?.jersey_name || '—')}
+                        </span>
+                      </td>
+                      <td class="py-3 px-4 font-semibold text-slate-900">${escapeHtml(p?.full_name || f.player_id)}</td>
+                      <td class="py-3 px-4 text-xs">
+                        <strong class="text-slate-900 block">${escapeHtml(f.period_label)}</strong>
+                        <span class="text-slate-500">${escapeHtml(f.fee_type)}</span>
+                      </td>
+                      <td class="py-3 px-4 text-xs text-slate-600">${escapeHtml(f.due_date)}</td>
+                      <td class="py-3 px-4 text-xs">
+                        <span class="font-bold text-emerald-700">${formatUGX(f.amount_paid_ugx)}</span> / ${formatUGX(f.amount_due_ugx)}
+                        ${bal > 0 ? `<span class="block text-amber-600 font-semibold">Bal: ${formatUGX(bal)}</span>` : ''}
+                      </td>
+                      <td class="py-3 px-4"><span class="px-2.5 py-0.5 rounded-full text-xs font-bold ${badge}">${escapeHtml(f.status)}</span></td>
+                      ${isAdmin ? `
+                        <td class="py-3 px-4 text-right">
+                          ${bal > 0 ? `<button onclick="openFeePayModal('${f.id}')" class="px-3 py-1 rounded-lg bg-forest-800 text-white text-xs font-semibold">Record Payment</button>` : '<span class="text-xs text-slate-400">Cleared</span>'}
+                        </td>
+                      ` : ''}
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    function openBulkFeeModal() {
+      if (!guardAdminAction()) return;
+      openModal('Bulk-Assign Squad Membership Fee', `
+        <form onsubmit="saveBulkFeeForm(event)" class="space-y-4 text-sm">
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Period Label *</label>
+            <input name="period_label" required value="December 2026" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Fee Type</label>
+              <select name="fee_type" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white">
+                <option value="Monthly Subscription">Monthly Subscription</option>
+                <option value="Annual Registration">Annual Registration</option>
+                <option value="Tournament Levy">Tournament Levy</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Amount Due (UGX) *</label>
+              <input name="amount_due_ugx" type="number" min="1000" step="500" value="30000" required class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Due Date *</label>
+            <input name="due_date" type="date" required value="2026-12-05" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+          </div>
+          <div class="flex justify-end gap-2 pt-2">
+            <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-xl bg-slate-100 font-semibold">Cancel</button>
+            <button type="submit" class="px-5 py-2 rounded-xl bg-forest-800 text-white font-bold">Assign to Active Players</button>
+          </div>
+        </form>
+      `);
+    }
+
+    function saveBulkFeeForm(e) {
+      e.preventDefault();
+      if (!guardAdminAction()) return;
+      const fd = new FormData(e.target);
+      const period = fd.get('period_label').trim();
+      const feeType = fd.get('fee_type');
+      const dueAmt = Number(fd.get('amount_due_ugx'));
+      const dueDate = fd.get('due_date');
+      let added = 0;
+
+      db.players.filter(p => p.status === 'Active').forEach(p => {
+        const exists = db.membership_fees.some(f => f.player_id === p.id && f.period_label === period && f.fee_type === feeType);
+        if (!exists) {
+          db.membership_fees.push({
+            id: nextId('FEE', db.membership_fees, 3),
+            player_id: p.id,
+            period_label: period,
+            fee_type: feeType,
+            amount_due_ugx: dueAmt,
+            amount_paid_ugx: 0,
+            due_date: dueDate,
+            status: 'Pending'
+          });
+          added++;
+        }
+      });
+      saveDatabase();
+      closeModal();
+      renderApp();
+      showToast(`Assigned ${period} fee to ${added} active players.`);
+    }
+
+    function openFeePayModal(feeId) {
+      if (!guardAdminAction()) return;
+      const f = db.membership_fees.find(item => item.id === feeId);
+      if (!f) return;
+      const p = getPlayer(f.player_id);
+      const bal = Math.max(0, Number(f.amount_due_ugx) - Number(f.amount_paid_ugx));
+      openModal(`Record Fee Payment — ${p?.full_name || f.player_id}`, `
+        <form onsubmit="saveFeePayment(event, '${f.id}')" class="space-y-4 text-sm">
+          <p class="text-xs text-slate-600">${escapeHtml(f.period_label)} (${escapeHtml(f.fee_type)}) • Remaining Balance: <strong>${formatUGX(bal)}</strong></p>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Amount Paying (UGX) *</label>
+              <input name="pay_amount" type="number" min="500" max="${bal}" value="${bal}" required class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Payment Method</label>
+              <select name="payment_method" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white">
+                ${['MTN MoMo', 'Cash', 'Airtel Money', 'Bank Transfer'].map(m => `<option value="${m}">${m}</option>`).join('')}
+              </select>
+            </div>
+          </div>
+          <div class="flex justify-end gap-2 pt-2">
+            <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-xl bg-slate-100 font-semibold">Cancel</button>
+            <button type="submit" class="px-5 py-2 rounded-xl bg-forest-800 text-white font-bold">Confirm Payment & Receipt</button>
+          </div>
+        </form>
+      `);
+    }
+
+    function saveFeePayment(e, feeId) {
+      e.preventDefault();
+      if (!guardAdminAction()) return;
+      const f = db.membership_fees.find(item => item.id === feeId);
+      if (!f) return;
+      const p = getPlayer(f.player_id);
+      const fd = new FormData(e.target);
+      const payAmt = Number(fd.get('pay_amount'));
+      f.amount_paid_ugx = Number(f.amount_paid_ugx) + payAmt;
+      f.status = f.amount_paid_ugx >= Number(f.amount_due_ugx) ? 'Paid' : 'Partial';
+
+      db.transactions.push({
+        id: nextId('TX', db.transactions, 3),
+        receipt_number: nextReceiptNumber(),
+        tx_type: 'Income',
+        category: 'Membership Fee',
+        description: `${f.period_label} ${f.fee_type}`,
+        player_id: f.player_id,
+        payer_name: p?.full_name || f.player_id,
+        jersey_name: p?.jersey_name || 'N/A',
+        jersey_number: p ? String(p.jersey_number) : 'N/A',
+        size_category: 'N/A',
+        amount_ugx: payAmt,
+        payment_method: fd.get('payment_method'),
+        tx_date: new Date().toISOString().slice(0, 10),
+        recorded_by: 'Club Admin'
+      });
+
+      saveDatabase();
+      closeModal();
+      renderApp();
+      showToast(`Recorded ${formatUGX(payAmt)} fee payment & issued receipt.`);
+    }
+
+    // =========================================================================
+    // 6. TRAINING ATTENDANCE MODULE (WITH JERSEY NAME COLUMN)
+    // =========================================================================
+    function renderAttendance() {
+      const sessions = [...db.training_sessions].sort((a, b) => b.session_date.localeCompare(a.session_date));
+      if (!uiFilters.selectedSessionId && sessions.length) {
+        uiFilters.selectedSessionId = sessions[0].id;
+      }
+      const activeSession = sessions.find(s => s.id === uiFilters.selectedSessionId);
+
+      return `
+        <div class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 flex flex-wrap items-center justify-between gap-3">
+          <div class="flex flex-wrap items-center gap-3">
+            <label class="text-xs font-bold uppercase text-slate-500">Training Session:</label>
+            <select onchange="uiFilters.selectedSessionId = this.value; renderApp();"
+              class="px-3.5 py-2 rounded-xl border border-slate-300 text-sm bg-white font-medium">
+              ${sessions.map(s =>
+                `<option value="${s.id}" ${s.id === activeSession?.id ? 'selected' : ''}>${escapeHtml(s.session_date)} (${escapeHtml(s.session_time)}) — ${escapeHtml(s.focus_area)}</option>`
+              ).join('')}
+            </select>
+          </div>
+          ${isAdmin ? `
+            <button onclick="openSessionModal()" class="px-4 py-2.5 rounded-xl bg-forest-800 hover:bg-forest-700 text-white text-xs font-bold">
+              + New Training Session
+            </button>
+          ` : ''}
+        </div>
+
+        ${activeSession ? `
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 space-y-4">
+            <div class="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-100">
+              <div>
+                <h3 class="font-bold text-slate-900">${escapeHtml(activeSession.focus_area)}</h3>
+                <p class="text-xs text-slate-500">${escapeHtml(activeSession.session_date)} at ${escapeHtml(activeSession.session_time)} • ${escapeHtml(activeSession.venue)} • ${escapeHtml(activeSession.coach_in_charge)}</p>
+              </div>
+              <span class="px-3 py-1 rounded-full text-xs font-bold bg-forest-900 text-limeclub">${escapeHtml(activeSession.id)}</span>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-sm">
+                <thead class="bg-slate-50 border-b border-slate-200 text-xs uppercase text-slate-500">
+                  <tr>
+                    <th class="py-2.5 px-3">Jersey #</th>
+                    <th class="py-2.5 px-3">Jersey Name</th>
+                    <th class="py-2.5 px-3">Player Full Name</th>
+                    <th class="py-2.5 px-3">Roll-Call Status</th>
+                    <th class="py-2.5 px-3">Remarks</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                  ${[...db.players].sort((a, b) => Number(a.jersey_number) - Number(b.jersey_number)).map(p => {
+                    const rec = db.attendance_records.find(r => r.session_id === activeSession.id && r.player_id === p.id);
+                    const st = rec ? rec.status : 'Absent';
+                    const badgeColor = st === 'Present' ? 'bg-emerald-600 text-white'
+                      : st === 'Late' ? 'bg-amber-500 text-white'
+                      : st === 'Excused' ? 'bg-sky-600 text-white' : 'bg-rose-600 text-white';
+
+                    return `
+                      <tr>
+                        <td class="py-2.5 px-3 font-extrabold text-forest-900">#${p.jersey_number}</td>
+                        <td class="py-2.5 px-3">
+                          <span class="px-2 py-0.5 rounded bg-forest-900 text-limeclub font-mono text-xs font-bold">${escapeHtml(p.jersey_name)}</span>
+                        </td>
+                        <td class="py-2.5 px-3 font-semibold text-slate-900">${escapeHtml(p.full_name)}</td>
+                        <td class="py-2.5 px-3">
+                          ${isAdmin ? `
+                            <div class="flex flex-wrap gap-1.5">
+                              ${['Present', 'Late', 'Excused', 'Absent'].map(opt => `
+                                <button onclick="setAttendanceStatus('${activeSession.id}', '${p.id}', '${opt}')"
+                                  class="px-2.5 py-1 rounded-lg text-xs font-bold transition ${
+                                    st === opt ? badgeColor : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                  }">${opt}</button>
+                              `).join('')}
+                            </div>
+                          ` : `<span class="px-2.5 py-1 rounded-lg text-xs font-bold ${badgeColor}">${escapeHtml(st)}</span>`}
+                        </td>
+                        <td class="py-2.5 px-3">
+                          ${isAdmin ? `
+                            <input type="text" value="${escapeHtml(rec?.remarks || '')}"
+                              onchange="setAttendanceRemark('${activeSession.id}', '${p.id}', this.value)"
+                              placeholder="Optional note..."
+                              class="w-full px-2.5 py-1 rounded-lg border border-slate-200 text-xs" />
+                          ` : `<span class="text-xs text-slate-600">${escapeHtml(rec?.remarks || '—')}</span>`}
+                        </td>
+                      </tr>
+                    `;
+                  }).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ` : ''}
+      `;
+    }
+
+    function setAttendanceStatus(sessionId, playerId, status) {
+      if (!guardAdminAction()) return;
+      let rec = db.attendance_records.find(r => r.session_id === sessionId && r.player_id === playerId);
+      if (rec) {
+        rec.status = status;
+      } else {
+        const nextNumericId = db.attendance_records.reduce((m, r) => Math.max(m, Number(r.id) || 0), 0) + 1;
+        db.attendance_records.push({ id: nextNumericId, session_id: sessionId, player_id: playerId, status, remarks: '' });
+      }
+      saveDatabase();
+      renderApp();
+    }
+
+    function setAttendanceRemark(sessionId, playerId, remarks) {
+      if (!guardAdminAction()) return;
+      let rec = db.attendance_records.find(r => r.session_id === sessionId && r.player_id === playerId);
+      if (rec) {
+        rec.remarks = remarks;
+      } else {
+        const nextNumericId = db.attendance_records.reduce((m, r) => Math.max(m, Number(r.id) || 0), 0) + 1;
+        db.attendance_records.push({ id: nextNumericId, session_id: sessionId, player_id: playerId, status: 'Absent', remarks });
+      }
+      saveDatabase();
+      showToast('Attendance remark saved.');
+    }
+
+    function openSessionModal() {
+      if (!guardAdminAction()) return;
+      openModal('Create Training Session', `
+        <form onsubmit="saveSessionForm(event)" class="space-y-4 text-sm">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Session Date *</label>
+              <input name="session_date" type="date" required value="${new Date().toISOString().slice(0, 10)}" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Time *</label>
+              <input name="session_time" type="time" required value="16:30" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Venue *</label>
+            <input name="venue" required value="${escapeHtml(db.club_settings.home_ground)}" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Tactical Focus Area *</label>
+            <input name="focus_area" required placeholder="e.g. Finishing & Wing Play" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Coach in Charge *</label>
+            <input name="coach_in_charge" required value="Coach Moses Kaggwa" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+          </div>
+          <div class="flex justify-end gap-2 pt-2">
+            <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-xl bg-slate-100 font-semibold">Cancel</button>
+            <button type="submit" class="px-5 py-2 rounded-xl bg-forest-800 text-white font-bold">Create Session</button>
+          </div>
+        </form>
+      `);
+    }
+
+    function saveSessionForm(e) {
+      e.preventDefault();
+      if (!guardAdminAction()) return;
+      const fd = new FormData(e.target);
+      const id = nextId('TRN', db.training_sessions, 2);
+      db.training_sessions.push({
+        id,
+        session_date: fd.get('session_date'),
+        session_time: fd.get('session_time'),
+        venue: fd.get('venue').trim(),
+        focus_area: fd.get('focus_area').trim(),
+        coach_in_charge: fd.get('coach_in_charge').trim()
+      });
+      uiFilters.selectedSessionId = id;
+      saveDatabase();
+      closeModal();
+      currentTab = 'attendance';
+      renderApp();
+      showToast(`Training session ${id} created.`);
+    }
+
+    // =========================================================================
+    // 7. MATCHES & FIXTURES MODULE (ADD & VIEW FIXTURES AND MATCHES)
+    // =========================================================================
+    function renderMatches() {
+      const completed = db.matches.filter(m => m.status === 'Completed');
+      let wins = 0, draws = 0, losses = 0;
+      completed.forEach(m => {
+        if (Number(m.goals_for) > Number(m.goals_against)) wins++;
+        else if (Number(m.goals_for) === Number(m.goals_against)) draws++;
+        else losses++;
+      });
+
+      const filtered = db.matches
+        .filter(m => uiFilters.matchFilter === 'All' || m.status === uiFilters.matchFilter)
+        .sort((a, b) => b.match_date.localeCompare(a.match_date));
+
+      return `
+        <div class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 flex flex-wrap items-center justify-between gap-3">
+          <div class="flex flex-wrap items-center gap-2">
+            ${['All', 'Scheduled', 'Completed', 'Postponed'].map(tab => `
+              <button onclick="uiFilters.matchFilter = '${tab}'; renderApp();"
+                class="px-3.5 py-2 rounded-xl text-xs font-bold transition ${
+                  uiFilters.matchFilter === tab ? 'bg-forest-900 text-limeclub' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }">${tab === 'Scheduled' ? 'Upcoming Fixtures' : tab === 'Completed' ? 'Match Results' : tab}</button>
+            `).join('')}
+            <div class="hidden sm:flex items-center gap-1.5 ml-3 pl-3 border-l border-slate-200 text-xs">
+              <span class="font-bold text-slate-500">Form:</span>
+              <span class="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 font-bold">W ${wins}</span>
+              <span class="px-2 py-0.5 rounded bg-amber-50 text-amber-700 font-bold">D ${draws}</span>
+              <span class="px-2 py-0.5 rounded bg-rose-50 text-rose-700 font-bold">L ${losses}</span>
+            </div>
+          </div>
+
+          ${isAdmin ? `
+            <button onclick="openMatchModal()" class="px-4 py-2.5 rounded-xl bg-forest-800 hover:bg-forest-700 text-white text-xs font-bold">
+              + Add Fixture / Match
+            </button>
+          ` : ''}
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          ${filtered.length ? filtered.map(m => `
+            <div class="bg-white rounded-2xl border border-slate-200 p-5 flex flex-col justify-between gap-3 shadow-xs">
+              <div class="flex items-center justify-between gap-2">
+                <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-forest-900 text-limeclub">${escapeHtml(m.competition)}</span>
+                <span class="text-xs font-semibold text-slate-500">${escapeHtml(m.match_date)} • ${escapeHtml(m.kickoff_time)}</span>
+              </div>
+              <div class="flex items-center justify-between py-2 gap-3">
+                <div>
+                  <p class="text-xs uppercase font-bold text-slate-400">${escapeHtml(m.venue_type)} • ${escapeHtml(m.venue_name)}</p>
+                  <h4 class="text-lg font-extrabold text-slate-900 mt-0.5">${escapeHtml(db.club_settings.club_name)} vs ${escapeHtml(m.opponent)}</h4>
+                </div>
+                <div class="text-right shrink-0">
+                  ${m.status === 'Completed'
+                    ? `<span class="px-3.5 py-1.5 rounded-xl bg-forest-900 text-white text-xl font-black">${m.goals_for} - ${m.goals_against}</span>`
+                    : `<span class="px-3 py-1 rounded-xl ${m.status === 'Postponed' ? 'bg-rose-50 text-rose-700' : 'bg-amber-50 text-amber-700'} text-xs font-bold">${escapeHtml(m.status)}</span>`
+                  }
+                </div>
+              </div>
+              <p class="text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-100">${escapeHtml(m.match_notes || 'No match notes provided.')}</p>
+              ${isAdmin ? `
+                <div class="flex justify-end pt-1">
+                  <button onclick="openMatchModal('${m.id}')" class="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-700">
+                    Edit Fixture / Score
+                  </button>
+                </div>
+              ` : ''}
+            </div>
+          `).join('') : '<div class="col-span-2 bg-white rounded-2xl border border-slate-200 p-8 text-center text-slate-500">No fixtures or matches found for this filter.</div>'}
+        </div>
+      `;
+    }
+
+    function openMatchModal(matchId = null) {
+      if (!guardAdminAction()) return;
+      const m = matchId ? db.matches.find(item => item.id === matchId) : null;
+      openModal(m ? `Edit Fixture vs ${m.opponent}` : 'Add New Fixture / Match', `
+        <form onsubmit="saveMatchForm(event, '${m ? m.id : ''}')" class="space-y-4 text-sm">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Opponent Club *</label>
+              <input name="opponent" required placeholder="e.g. Pallisa United FC" value="${escapeHtml(m?.opponent || '')}" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Competition *</label>
+              <input name="competition" required value="${escapeHtml(m?.competition || 'Regional League 2026/27')}" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+            </div>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Venue Type</label>
+              <select name="venue_type" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white">
+                ${['Home', 'Away', 'Neutral'].map(v => `<option value="${v}" ${m?.venue_type === v ? 'selected' : ''}>${v}</option>`).join('')}
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Stadium / Ground Name *</label>
+              <input name="venue_name" required value="${escapeHtml(m?.venue_name || db.club_settings.home_ground)}" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+            </div>
+          </div>
+          <div class="grid grid-cols-3 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Match Date *</label>
+              <input name="match_date" type="date" required value="${escapeHtml(m?.match_date || '')}" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Kickoff Time *</label>
+              <input name="kickoff_time" type="time" required value="${escapeHtml(m?.kickoff_time || '16:00')}" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Match Status</label>
+              <select name="status" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white">
+                ${['Scheduled', 'Completed', 'Postponed'].map(st => `<option value="${st}" ${m?.status === st ? 'selected' : ''}>${st}</option>`).join('')}
+              </select>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Central Hills SC Goals</label>
+              <input name="goals_for" type="number" min="0" placeholder="Leave blank if upcoming" value="${m?.goals_for ?? ''}" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Opponent Goals</label>
+              <input name="goals_against" type="number" min="0" placeholder="Leave blank if upcoming" value="${m?.goals_against ?? ''}" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Match Notes / Goalscorers / Assembly Info</label>
+            <textarea name="match_notes" rows="2" class="w-full px-3 py-2 rounded-xl border border-slate-300">${escapeHtml(m?.match_notes || '')}</textarea>
+          </div>
+          <div class="flex justify-end gap-2 pt-2">
+            <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-xl bg-slate-100 font-semibold">Cancel</button>
+            <button type="submit" class="px-5 py-2 rounded-xl bg-forest-800 text-white font-bold">Save Fixture / Match</button>
+          </div>
+        </form>
+      `);
+    }
+
+    function saveMatchForm(e, existingId) {
+      e.preventDefault();
+      if (!guardAdminAction()) return;
+      const fd = new FormData(e.target);
+      const gf = fd.get('goals_for');
+      const ga = fd.get('goals_against');
+      const record = {
+        id: existingId || nextId('MAT', db.matches, 2),
+        opponent: fd.get('opponent').trim(),
+        competition: fd.get('competition').trim(),
+        venue_type: fd.get('venue_type'),
+        venue_name: fd.get('venue_name').trim(),
+        match_date: fd.get('match_date'),
+        kickoff_time: fd.get('kickoff_time'),
+        goals_for: gf === '' ? null : Number(gf),
+        goals_against: ga === '' ? null : Number(ga),
+        status: fd.get('status'),
+        match_notes: fd.get('match_notes').trim()
+      };
+      if (existingId) {
+        const idx = db.matches.findIndex(item => item.id === existingId);
+        db.matches[idx] = record;
+      } else {
+        db.matches.push(record);
+      }
+      saveDatabase();
+      closeModal();
+      renderApp();
+      showToast(`Fixture vs ${record.opponent} saved.`);
+    }
+
+    // =========================================================================
+    // 8. EQUIPMENT INVENTORY MODULE
+    // =========================================================================
+    function renderEquipment() {
+      return `
+        <div class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 flex items-center justify-between">
+          <div>
+            <h3 class="font-bold text-slate-900">Club Training & Matchday Equipment</h3>
+            <p class="text-xs text-slate-500">Gear quantities and inspection condition status.</p>
+          </div>
+          ${isAdmin ? `<button onclick="openEquipmentModal()" class="px-4 py-2.5 rounded-xl bg-forest-800 text-white text-xs font-bold">+ Add Equipment</button>` : ''}
+        </div>
+
+        <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
+              <thead class="bg-slate-50 border-b border-slate-200 text-xs uppercase text-slate-500">
+                <tr>
+                  <th class="py-3 px-4">Item</th>
+                  <th class="py-3 px-4">Category</th>
+                  <th class="py-3 px-4">Usable / Total</th>
+                  <th class="py-3 px-4">Condition</th>
+                  <th class="py-3 px-4">Last Checked</th>
+                  ${isAdmin ? '<th class="py-3 px-4 text-right">Update Condition</th>' : ''}
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                ${db.equipment.map(eq => {
+                  const badge = eq.condition_status === 'Good' ? 'bg-emerald-50 text-emerald-700'
+                    : eq.condition_status === 'Needs Repair' ? 'bg-amber-50 text-amber-700' : 'bg-rose-50 text-rose-700';
+                  return `
+                    <tr>
+                      <td class="py-3 px-4 font-bold text-slate-900">${escapeHtml(eq.item_name)}</td>
+                      <td class="py-3 px-4 text-xs text-slate-600">${escapeHtml(eq.category)}</td>
+                      <td class="py-3 px-4 font-semibold">${eq.quantity_good} / ${eq.quantity_total}</td>
+                      <td class="py-3 px-4"><span class="px-2.5 py-0.5 rounded-full text-xs font-bold ${badge}">${escapeHtml(eq.condition_status)}</span></td>
+                      <td class="py-3 px-4 text-xs text-slate-500">${escapeHtml(eq.last_checked)}</td>
+                      ${isAdmin ? `
+                        <td class="py-3 px-4 text-right">
+                          <select onchange="updateEquipmentStatus('${eq.id}', this.value)" class="px-2.5 py-1 rounded-lg border border-slate-300 text-xs bg-white">
+                            ${['Good', 'Needs Repair', 'Replace'].map(st => `<option value="${st}" ${eq.condition_status === st ? 'selected' : ''}>${st}</option>`).join('')}
+                          </select>
+                        </td>
+                      ` : ''}
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    function updateEquipmentStatus(id, status) {
+      if (!guardAdminAction()) return;
+      const eq = db.equipment.find(item => item.id === id);
+      if (!eq) return;
+      eq.condition_status = status;
+      eq.last_checked = new Date().toISOString().slice(0, 10);
+      saveDatabase();
+      renderApp();
+      showToast(`Updated ${eq.item_name} to ${status}.`);
+    }
+
+    function openEquipmentModal() {
+      if (!guardAdminAction()) return;
+      openModal('Add Club Equipment', `
+        <form onsubmit="saveEquipmentForm(event)" class="space-y-4 text-sm">
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Item Name *</label>
+            <input name="item_name" required class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+          </div>
+          <div class="grid grid-cols-3 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Category *</label>
+              <input name="category" required value="Training Gear" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Total Qty *</label>
+              <input name="quantity_total" type="number" min="1" required class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Usable Qty *</label>
+              <input name="quantity_good" type="number" min="0" required class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+            </div>
+          </div>
+          <div class="flex justify-end gap-2 pt-2">
+            <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-xl bg-slate-100 font-semibold">Cancel</button>
+            <button type="submit" class="px-5 py-2 rounded-xl bg-forest-800 text-white font-bold">Save Equipment</button>
+          </div>
+        </form>
+      `);
+    }
+
+    function saveEquipmentForm(e) {
+      e.preventDefault();
+      if (!guardAdminAction()) return;
+      const fd = new FormData(e.target);
+      const tot = Number(fd.get('quantity_total'));
+      const good = Math.min(tot, Number(fd.get('quantity_good')));
+      db.equipment.push({
+        id: nextId('EQP', db.equipment, 2),
+        item_name: fd.get('item_name').trim(),
+        category: fd.get('category').trim(),
+        quantity_total: tot,
+        quantity_good: good,
+        condition_status: good === tot ? 'Good' : 'Needs Repair',
+        last_checked: new Date().toISOString().slice(0, 10)
+      });
+      saveDatabase();
+      closeModal();
+      renderApp();
+      showToast('Equipment item added.');
+    }
+
+    // =========================================================================
+    // 9. NOTICEBOARD MODULE
+    // =========================================================================
+    function renderNotices() {
+      const sorted = [...db.notices].sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.created_at.localeCompare(a.created_at));
+      return `
+        <div class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 flex items-center justify-between">
+          <div>
+            <h3 class="font-bold text-slate-900">Club Noticeboard & Directives</h3>
+            <p class="text-xs text-slate-500">Official communications for players, technical staff, and supporters.</p>
+          </div>
+          ${isAdmin ? `<button onclick="openNoticeModal()" class="px-4 py-2.5 rounded-xl bg-forest-800 text-white text-xs font-bold">+ Post Notice</button>` : ''}
+        </div>
+
+        <div class="space-y-3">
+          ${sorted.map(n => `
+            <div class="bg-white rounded-2xl border ${Number(n.pinned) === 1 ? 'border-forest-700 ring-1 ring-forest-700/20' : 'border-slate-200'} p-5 space-y-2">
+              <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center gap-2">
+                  <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-forest-900 text-limeclub">${escapeHtml(n.category)}</span>
+                  ${Number(n.pinned) === 1 ? '<span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800">PINNED</span>' : ''}
+                </div>
+                ${isAdmin ? `
+                  <button onclick="toggleNoticePin('${n.id}')" class="text-xs font-bold text-forest-800 hover:underline">
+                    ${Number(n.pinned) === 1 ? 'Unpin' : 'Pin to Top'}
+                  </button>
+                ` : ''}
+              </div>
+              <h4 class="font-extrabold text-base text-slate-900">${escapeHtml(n.title)}</h4>
+              <p class="text-sm text-slate-600 leading-relaxed">${escapeHtml(n.body)}</p>
+              <p class="text-xs text-slate-400">Posted on ${escapeHtml(n.created_at)} by ${escapeHtml(n.author)}</p>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    function toggleNoticePin(id) {
+      if (!guardAdminAction()) return;
+      const n = db.notices.find(item => item.id === id);
+      if (!n) return;
+      n.pinned = Number(n.pinned) === 1 ? 0 : 1;
+      saveDatabase();
+      renderApp();
+    }
+
+    function openNoticeModal() {
+      if (!guardAdminAction()) return;
+      openModal('Post Club Announcement', `
+        <form onsubmit="saveNoticeForm(event)" class="space-y-4 text-sm">
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Announcement Title *</label>
+            <input name="title" required class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Category</label>
+              <select name="category" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white">
+                ${['General', 'Matchday', 'Finance', 'Training', 'Urgent'].map(c => `<option value="${c}">${c}</option>`).join('')}
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Author *</label>
+              <input name="author" required value="Club Administration" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Message *</label>
+            <textarea name="body" rows="3" required class="w-full px-3 py-2 rounded-xl border border-slate-300"></textarea>
+          </div>
+          <label class="inline-flex items-center gap-2 text-xs font-semibold text-slate-700">
+            <input type="checkbox" name="pinned" checked class="rounded" /> Pin notice to Dashboard
+          </label>
+          <div class="flex justify-end gap-2 pt-2">
+            <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-xl bg-slate-100 font-semibold">Cancel</button>
+            <button type="submit" class="px-5 py-2 rounded-xl bg-forest-800 text-white font-bold">Publish Notice</button>
+          </div>
+        </form>
+      `);
+    }
+
+    function saveNoticeForm(e) {
+      e.preventDefault();
+      if (!guardAdminAction()) return;
+      const fd = new FormData(e.target);
+      db.notices.push({
+        id: nextId('NOT', db.notices, 2),
+        title: fd.get('title').trim(),
+        category: fd.get('category'),
+        body: fd.get('body').trim(),
+        pinned: fd.get('pinned') ? 1 : 0,
+        created_at: new Date().toISOString().slice(0, 10),
+        author: fd.get('author').trim()
+      });
+      saveDatabase();
+      closeModal();
+      renderApp();
+      showToast('Announcement published.');
+    }
+
+    // =========================================================================
+    // 10. REPORTS & ADMIN SETTINGS (CLEAN EXECUTIVE VIEW — NO RAW JSON DUMPS)
+    // =========================================================================
+    function renderReports() {
+      const totalIncome = db.transactions.filter(t => t.tx_type === 'Income').reduce((s, t) => s + Number(t.amount_ugx || 0), 0);
+      const totalExpense = db.transactions.filter(t => t.tx_type === 'Expense').reduce((s, t) => s + Number(t.amount_ugx || 0), 0);
+      const netCash = totalIncome - totalExpense;
+
+      return `
+        <!-- Clean Financial & Squad Summary -->
+        <div class="bg-white rounded-2xl border border-slate-200 p-6 space-y-5">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 class="font-bold text-slate-900 text-base">Executive Club Summary — Season ${escapeHtml(db.club_settings.season)}</h3>
+              <p class="text-xs text-slate-500">Consolidated financial and squad operational overview for ${escapeHtml(db.club_settings.club_name)}.</p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <button onclick="exportPlayersCsv()" class="px-4 py-2.5 rounded-xl bg-forest-900 text-limeclub text-xs font-bold">
+                Download Players CSV
+              </button>
+              <button onclick="exportTransactionsCsv()" class="px-4 py-2.5 rounded-xl bg-forest-900 text-limeclub text-xs font-bold">
+                Download Ledger CSV
+              </button>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div class="p-4 rounded-xl bg-emerald-50 border border-emerald-200">
+              <p class="text-xs font-bold uppercase text-emerald-800">Total Club Income</p>
+              <p class="text-xl font-black text-emerald-900 mt-1">${formatUGX(totalIncome)}</p>
+            </div>
+            <div class="p-4 rounded-xl bg-rose-50 border border-rose-200">
+              <p class="text-xs font-bold uppercase text-rose-800">Total Club Expenses</p>
+              <p class="text-xl font-black text-rose-900 mt-1">${formatUGX(totalExpense)}</p>
+            </div>
+            <div class="p-4 rounded-xl bg-slate-50 border border-slate-200">
+              <p class="text-xs font-bold uppercase text-slate-600">Net Cash Position</p>
+              <p class="text-xl font-black text-forest-900 mt-1">${formatUGX(netCash)}</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Admin-Only Security, Crest & Backup Controls (No raw JSON exposed) -->
+        ${isAdmin ? `
+          <div class="bg-white rounded-2xl border border-slate-200 p-6 space-y-5">
+            <div>
+              <h3 class="font-bold text-slate-900 text-base">Administrator Controls & Security</h3>
+              <p class="text-xs text-slate-500">Manage the club crest, update the Admin PIN, or download/restore an encrypted backup file.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <!-- Club Crest Upload -->
+              <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 flex items-center gap-4">
+                <div class="w-16 h-16 rounded-2xl bg-white border border-slate-200 p-1 shrink-0 overflow-hidden">${renderCrestHtml()}</div>
+                <div class="space-y-2">
+                  <p class="font-bold text-sm text-slate-900">Official Club Crest</p>
+                  <p class="text-xs text-slate-500">Upload a custom crest image or keep the default Central Hills SC badge.</p>
+                  <div class="flex flex-wrap gap-2">
+                    <button onclick="document.getElementById('logoFileInput').click()" class="px-3 py-1.5 rounded-lg bg-forest-800 text-white text-xs font-bold">Upload Crest Image</button>
+                    ${db.club_settings.custom_logo_data ? `<button onclick="resetCustomLogo()" class="px-3 py-1.5 rounded-lg bg-slate-200 text-slate-700 text-xs font-semibold">Reset Default</button>` : ''}
+                  </div>
+                </div>
+              </div>
+
+              <!-- Admin PIN Change -->
+              <form onsubmit="changeAdminPin(event)" class="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5">
+                <p class="font-bold text-sm text-slate-900">Change Administrator PIN</p>
+                <p class="text-xs text-slate-500">Update the PIN required to unlock data entry mode.</p>
+                <div class="flex gap-2">
+                  <input type="password" name="new_pin" required minlength="4" placeholder="New PIN (min 4 chars)" class="flex-1 px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-xs" />
+                  <button type="submit" class="px-3.5 py-1.5 rounded-lg bg-forest-800 text-white text-xs font-bold">Update PIN</button>
+                </div>
+              </form>
+            </div>
+
+            <div class="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
+              <span class="text-xs font-semibold text-slate-500">Offline Club Backup File:</span>
+              <div class="flex flex-wrap gap-2">
+                <button onclick="document.getElementById('jsonFileInput').click()" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold">
+                  Restore Backup File
+                </button>
+                <button onclick="exportBackupFile()" class="px-3.5 py-2 rounded-xl bg-forest-800 hover:bg-forest-700 text-white text-xs font-bold">
+                  Download Club Backup
+                </button>
+              </div>
+            </div>
+          </div>
+        ` : `
+          <div class="bg-white rounded-2xl border border-slate-200 p-6 flex items-center justify-between gap-4">
+            <div>
+              <h3 class="font-bold text-slate-900 text-sm">Administrative System Settings</h3>
+              <p class="text-xs text-slate-500 mt-0.5">Crest configuration, PIN management, and database backups are restricted to authorized Club Administrators.</p>
+            </div>
+            <button onclick="openAdminLoginModal()" class="px-4 py-2 rounded-xl bg-forest-800 text-white text-xs font-bold shrink-0">Admin Login</button>
+          </div>
+        `}
+      `;
+    }
+
+    function changeAdminPin(e) {
+      e.preventDefault();
+      if (!guardAdminAction()) return;
+      const newPin = new FormData(e.target).get('new_pin').trim();
+      if (newPin.length < 4) return;
+      db.club_settings.admin_pin = newPin;
+      saveDatabase();
+      e.target.reset();
+      showToast('Administrator PIN updated successfully.');
+    }
+
+    function resetCustomLogo() {
+      if (!guardAdminAction()) return;
+      db.club_settings.custom_logo_data = '';
+      saveDatabase();
+      renderApp();
+      showToast('Restored default Central Hills SC logo.');
+    }
+
+    document.getElementById('logoFileInput').addEventListener('change', (e) => {
+      if (!guardAdminAction()) return;
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        db.club_settings.custom_logo_data = ev.target.result;
+        saveDatabase();
+        renderApp();
+        showToast('Club crest updated.');
+      };
+      reader.readAsDataURL(file);
+      e.target.value = '';
+    });
+
+    function exportBackupFile() {
+      if (!guardAdminAction()) return;
+      const blob = new Blob([JSON.stringify(db)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `central_hills_sc_backup_${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast('Club backup file downloaded.');
+    }
+
+    document.getElementById('jsonFileInput').addEventListener('change', (e) => {
+      if (!guardAdminAction()) return;
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        try {
+          const parsed = JSON.parse(ev.target.result);
+          const seed = createSeedDatabase();
+          db = {
+            meta: parsed.meta || seed.meta,
+            club_settings: { ...seed.club_settings, ...(parsed.club_settings || {}) },
+            players: Array.isArray(parsed.players) ? parsed.players : seed.players,
+            uniform_stock: Array.isArray(parsed.uniform_stock) ? parsed.uniform_stock : seed.uniform_stock,
+            uniform_orders: Array.isArray(parsed.uniform_orders) ? parsed.uniform_orders : seed.uniform_orders,
+            transactions: Array.isArray(parsed.transactions) ? parsed.transactions : seed.transactions,
+            membership_fees: Array.isArray(parsed.membership_fees) ? parsed.membership_fees : seed.membership_fees,
+            training_sessions: Array.isArray(parsed.training_sessions) ? parsed.training_sessions : seed.training_sessions,
+            attendance_records: Array.isArray(parsed.attendance_records) ? parsed.attendance_records : seed.attendance_records,
+            matches: Array.isArray(parsed.matches) ? parsed.matches : seed.matches,
+            equipment: Array.isArray(parsed.equipment) ? parsed.equipment : seed.equipment,
+            notices: Array.isArray(parsed.notices) ? parsed.notices : seed.notices
+          };
+          saveDatabase();
+          renderApp();
+          showToast('Club backup restored successfully.');
+        } catch (err) {
+          showToast('Invalid backup file selected.', true);
+        }
+        e.target.value = '';
+      };
+      reader.readAsText(file);
+    });
+
+    function downloadCsv(filename, rows) {
+      const csv = rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast(`Exported ${filename}`);
+    }
+
+    function exportPlayersCsv() {
+      const rows = [
+        ['ID', 'Jersey #', 'Jersey Name', 'Full Name', 'Position', 'DOB', 'Phone', 'Status', 'Joined Date'],
+        ...db.players.map(p => [p.id, p.jersey_number, p.jersey_name, p.full_name, p.position, p.date_of_birth, p.phone, p.status, p.joined_date])
+      ];
+      downloadCsv('central_hills_sc_players.csv', rows);
+    }
+
+    function exportTransactionsCsv() {
+      const rows = [
+        ['Receipt #', 'Date', 'Type', 'Category', 'Description', 'Player / Payer', 'Jersey Name', 'Jersey No.', 'Size Category', 'Method', 'Amount (UGX)'],
+        ...db.transactions.map(t => {
+          const p = getPlayer(t.player_id);
+          return [
+            t.receipt_number,
+            t.tx_date,
+            t.tx_type,
+            t.category,
+            t.description,
+            t.payer_name || getPlayerDisplay(t.player_id),
+            t.jersey_name || p?.jersey_name || 'N/A',
+            t.jersey_number || (p ? p.jersey_number : 'N/A'),
+            t.size_category || 'N/A',
+            t.payment_method,
+            t.amount_ugx
+          ];
+        })
+      ];
+      downloadCsv('central_hills_sc_ledger.csv', rows);
+    }
+
+    // Boot application
+    window.addEventListener('DOMContentLoaded', renderApp);
+  </script>
+</body>
+</html>
