@@ -7,7 +7,7 @@ export default function handler(req, res) {
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
     const { pin } = body || {};
-    const expectedPin = process.env.ADMIN_PIN || '12345678';
+    const expectedPin = process.env.ADMIN_PIN || '18102001';
 
     if (pin === expectedPin) {
       res.setHeader('Set-Cookie', 'chscms_admin=true; Path=/; HttpOnly; Secure; SameSite=Lax');
