@@ -1,13 +1,12 @@
 {
-  "name": "central-hills-sc-kacheri",
+  "name": "central_hills_sc_app",
   "version": "1.0.0",
-  "private": true,
-  "description": "Central Hills SC management app with server-side administrator authentication",
-  "scripts": {
-    "start": "node --env-file-if-exists=.env server.js",
-    "test": "node --test"
+  "type": "module",
+  "description": "Central Hills SC Club Management System",
+  "dependencies": {
+    "dotenv": "^16.4.5"
   },
   "engines": {
-    "node": ">=22.9.0"
+    "node": "20.x"
   }
 }
