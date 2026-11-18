@@ -99,7 +99,7 @@
       <div id="viewOnlyStrip" class="mx-4 sm:mx-6 mt-4 px-4 py-2.5 rounded-2xl bg-sky-50 border border-sky-200 text-sky-900 flex flex-wrap items-center justify-between gap-2 text-xs">
         <div class="flex items-center gap-2">
           <span class="px-2 py-0.5 rounded-md bg-sky-700 text-white font-bold uppercase tracking-wider text-[10px]">Players & Staff View</span>
-          <span>You are viewing live club records in <strong>Read-Only Mode</strong>. Only authorized Club Administrators can add or edit entries.</span>
+          <span>You are viewing live club records in <strong>Read-Only Mode</strong>. Players and staff may submit registration details for review; only authorized Club Administrators can edit official records.</span>
         </div>
         <button onclick="openAdminLoginModal()" class="font-bold text-forest-800 hover:underline shrink-0">ADMIN PAGE &rarr;</button>
       </div>
@@ -287,6 +287,7 @@
         meta: parsed.meta || seed.meta,
         club_settings: { ...seed.club_settings, ...(parsed.club_settings || {}) },
         players: Array.isArray(parsed.players) ? parsed.players : seed.players,
+        registration_requests: Array.isArray(parsed.registration_requests) ? parsed.registration_requests : [],
         uniform_stock: Array.isArray(parsed.uniform_stock) ? parsed.uniform_stock : seed.uniform_stock,
         uniform_orders: Array.isArray(parsed.uniform_orders) ? parsed.uniform_orders : seed.uniform_orders,
         transactions: Array.isArray(parsed.transactions) ? parsed.transactions : seed.transactions,
@@ -339,6 +340,10 @@
         hasServerData = serverData !== null;
         db = hasServerData ? normalizeDatabase(serverData) : loadLegacyDatabase();
         isAdmin = session.authenticated;
+        if (isAdmin) {
+          const registrations = await apiRequest('/api/registrations');
+          db.registration_requests = registrations.requests;
+        }
         renderApp();
       } catch (error) {
         db = loadLegacyDatabase();
@@ -742,12 +747,24 @@
           <div class="bg-white rounded-2xl p-4 border border-emerald-200 flex flex-wrap items-center justify-between gap-3">
             <span class="text-xs font-extrabold uppercase tracking-wider text-forest-800">Admin Quick Entry</span>
             <div class="flex flex-wrap gap-2">
-              <button onclick="openPlayerModal()" class="px-3.5 py-2 rounded-xl bg-forest-800 hover:bg-forest-700 text-white text-xs font-bold">+ Register Player</button>
               <button onclick="openTransactionModal()" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold">+ Record Receipt / Expense</button>
               <button onclick="openMatchModal()" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold">+ Add Fixture / Match</button>
               <button onclick="openSessionModal()" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold">+ New Training Session</button>
             </div>
           </div>
+        ` : ''}
+        ${!isAdmin ? `
+          <section class="bg-white rounded-2xl border border-sky-200 p-5 space-y-3">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 class="font-bold text-slate-900">Player Registration</h3>
+                <p class="text-sm text-slate-600 mt-1">Submit your details for club review. An administrator will add approved registrations to the official squad.</p>
+              </div>
+              <button onclick="openRegistrationRequestModal()" class="px-4 py-2.5 rounded-xl bg-forest-800 hover:bg-forest-700 text-white text-sm font-bold">
+                Submit Registration Details
+              </button>
+            </div>
+          </section>
         ` : ''}
 
         <!-- Pinned Notices & Recent Transactions -->
@@ -813,6 +830,32 @@
         .sort((a, b) => Number(a.jersey_number) - Number(b.jersey_number));
 
       return `
+        ${isAdmin && db.registration_requests.length ? `
+          <section class="bg-amber-50 rounded-2xl border border-amber-200 p-4 sm:p-5 space-y-3">
+            <div class="flex items-center justify-between gap-3">
+              <div>
+                <h3 class="font-bold text-amber-950">Pending Player Registrations</h3>
+                <p class="text-xs text-amber-800 mt-1">Review these submissions and assign a jersey before transferring them to the official squad.</p>
+              </div>
+              <span class="px-2.5 py-1 rounded-full bg-white text-amber-900 border border-amber-200 text-xs font-bold">${db.registration_requests.length} pending</span>
+            </div>
+            <div class="space-y-2">
+              ${db.registration_requests.map(request => `
+                <article class="bg-white rounded-xl border border-amber-200 p-3 flex flex-wrap items-center justify-between gap-3">
+                  <div class="min-w-0">
+                    <p class="font-bold text-slate-900">${escapeHtml(request.full_name)}</p>
+                    <p class="text-xs text-slate-600 mt-0.5">${escapeHtml(request.position)} • DOB: ${escapeHtml(request.date_of_birth)} • ${escapeHtml(request.phone)}</p>
+                    ${request.guardian_contact ? `<p class="text-xs text-slate-500 mt-0.5">Guardian: ${escapeHtml(request.guardian_contact)}</p>` : ''}
+                    <p class="text-[11px] text-slate-400 mt-1">Submitted ${escapeHtml(request.created_at)}</p>
+                  </div>
+                  <button onclick="openPlayerModal('', '${request.id}')" class="px-3.5 py-2 rounded-xl bg-forest-800 hover:bg-forest-700 text-white text-xs font-bold shrink-0">
+                    Transfer to Squad
+                  </button>
+                </article>
+              `).join('')}
+            </div>
+          </section>
+        ` : ''}
         <div class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div class="flex flex-wrap items-center gap-2.5 flex-1">
             <input type="text" value="${escapeHtml(uiFilters.playerSearch)}"
@@ -826,11 +869,6 @@
               ).join('')}
             </select>
           </div>
-          ${isAdmin ? `
-            <button onclick="openPlayerModal()" class="px-4 py-2.5 rounded-xl bg-forest-800 hover:bg-forest-700 text-white text-sm font-bold shrink-0">
-              + Register New Player
-            </button>
-          ` : ''}
         </div>
 
         <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden">
@@ -887,19 +925,93 @@
       `;
     }
 
-    function openPlayerModal(playerId = null) {
+    function openRegistrationRequestModal() {
+      if (isAdmin) {
+        showToast('Player registration submissions are only available in Players & Staff view.', true);
+        return;
+      }
+      openModal('Submit Player Registration Details', `
+        <form onsubmit="submitRegistrationRequest(event)" class="space-y-4 text-sm">
+          <p class="text-xs text-slate-600">These details will be sent to club administrators for review. Jersey details are assigned by the club after approval.</p>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Full Name *</label>
+            <input name="full_name" required maxlength="120" autocomplete="name" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Date of Birth *</label>
+              <input name="date_of_birth" type="date" required class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Position *</label>
+              <select name="position" required class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white">
+                ${['Goalkeeper', 'Defender', 'Midfielder', 'Forward'].map(position => `<option value="${position}">${position}</option>`).join('')}
+              </select>
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Phone Number *</label>
+            <input name="phone" type="tel" required maxlength="32" autocomplete="tel" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Guardian Contact (if applicable)</label>
+            <input name="guardian_contact" maxlength="120" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+          </div>
+          <div class="flex justify-end gap-2 pt-2">
+            <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 font-semibold">Cancel</button>
+            <button type="submit" class="px-5 py-2 rounded-xl bg-forest-800 text-white font-bold">Submit for Review</button>
+          </div>
+        </form>
+      `);
+    }
+
+    async function submitRegistrationRequest(e) {
+      e.preventDefault();
+      if (isAdmin) {
+        showToast('Player registration submissions are only available in Players & Staff view.', true);
+        return;
+      }
+      const form = e.target;
+      const submitButton = form.querySelector('button[type="submit"]');
+      submitButton.disabled = true;
+      try {
+        const formData = new FormData(form);
+        await apiRequest('/api/registrations', {
+          method: 'POST',
+          body: JSON.stringify({
+            full_name: formData.get('full_name'),
+            date_of_birth: formData.get('date_of_birth'),
+            position: formData.get('position'),
+            phone: formData.get('phone'),
+            guardian_contact: formData.get('guardian_contact')
+          })
+        });
+        closeModal();
+        showToast('Registration details submitted for club review.');
+      } catch (error) {
+        submitButton.disabled = false;
+        showToast(`Could not submit registration details: ${error.message}`, true);
+      }
+    }
+
+    function openPlayerModal(playerId = null, registrationId = null) {
       if (!guardAdminAction()) return;
       const p = playerId ? db.players.find(item => item.id === playerId) : null;
-      openModal(p ? `Edit Player — ${p.full_name}` : 'Register New Squad Player', `
-        <form onsubmit="savePlayerForm(event, '${p ? p.id : ''}')" class="space-y-4 text-sm">
+      const request = registrationId ? db.registration_requests.find(item => item.id === registrationId) : null;
+      if (registrationId && !request) {
+        showToast('This registration request is no longer available. Refresh and try again.', true);
+        return;
+      }
+      openModal(p ? `Edit Player — ${p.full_name}` : `Transfer Registration — ${request?.full_name || 'New Squad Player'}`, `
+        <form onsubmit="savePlayerForm(event, '${p ? p.id : ''}', '${request?.id || ''}')" class="space-y-4 text-sm">
           <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
             <div class="sm:col-span-2">
               <label class="block text-xs font-semibold text-slate-600 mb-1">Full Name *</label>
-              <input name="full_name" required value="${escapeHtml(p?.full_name || '')}" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+              <input name="full_name" required value="${escapeHtml(p?.full_name || request?.full_name || '')}" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
             </div>
             <div>
               <label class="block text-xs font-semibold text-slate-600 mb-1">Jersey Name *</label>
-              <input name="jersey_name" required placeholder="e.g. MUGISHA" value="${escapeHtml(p?.jersey_name || '')}" class="w-full px-3 py-2 rounded-xl border border-slate-300 uppercase font-mono" />
+              <input name="jersey_name" required placeholder="e.g. MUGISHA" value="${escapeHtml(p?.jersey_name || request?.full_name.split(' ').pop().toUpperCase() || '')}" class="w-full px-3 py-2 rounded-xl border border-slate-300 uppercase font-mono" />
             </div>
             <div>
               <label class="block text-xs font-semibold text-slate-600 mb-1">Jersey # *</label>
@@ -911,13 +1023,13 @@
               <label class="block text-xs font-semibold text-slate-600 mb-1">Position *</label>
               <select name="position" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white">
                 ${['Goalkeeper', 'Defender', 'Midfielder', 'Forward'].map(pos =>
-                  `<option value="${pos}" ${p?.position === pos ? 'selected' : ''}>${pos}</option>`
+                  `<option value="${pos}" ${(p?.position || request?.position) === pos ? 'selected' : ''}>${pos}</option>`
                 ).join('')}
               </select>
             </div>
             <div>
               <label class="block text-xs font-semibold text-slate-600 mb-1">Date of Birth *</label>
-              <input name="date_of_birth" type="date" required value="${escapeHtml(p?.date_of_birth || '')}" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+              <input name="date_of_birth" type="date" required value="${escapeHtml(p?.date_of_birth || request?.date_of_birth || '')}" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
             </div>
             <div>
               <label class="block text-xs font-semibold text-slate-600 mb-1">Squad Status</label>
@@ -931,7 +1043,7 @@
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label class="block text-xs font-semibold text-slate-600 mb-1">Phone Number</label>
-              <input name="phone" value="${escapeHtml(p?.phone || '+256 ')}" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+              <input name="phone" value="${escapeHtml(p?.phone || request?.phone || '+256 ')}" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
             </div>
             <div>
               <label class="block text-xs font-semibold text-slate-600 mb-1">Joined Date</label>
@@ -950,7 +1062,7 @@
       `);
     }
 
-    function savePlayerForm(e, existingId) {
+    async function savePlayerForm(e, existingId, registrationId = '') {
       e.preventDefault();
       if (!guardAdminAction()) return;
       const fd = new FormData(e.target);
@@ -968,12 +1080,38 @@
         position: fd.get('position'),
         date_of_birth: fd.get('date_of_birth'),
         phone: fd.get('phone').trim(),
-        guardian_contact: existingId ? db.players.find(pl => pl.id === existingId)?.guardian_contact || '' : '',
+        guardian_contact: existingId ? db.players.find(pl => pl.id === existingId)?.guardian_contact || '' : registrationId ? db.registration_requests.find(request => request.id === registrationId)?.guardian_contact || '' : '',
         national_id: existingId ? db.players.find(pl => pl.id === existingId)?.national_id || '' : '',
         medical_notes: fd.get('medical_notes').trim() || 'Fit & Cleared',
         status: fd.get('status'),
         joined_date: fd.get('joined_date')
       };
+      if (registrationId) {
+        try {
+          await databaseSaveQueue;
+          const result = await apiRequest('/api/registrations', {
+            method: 'PATCH',
+            body: JSON.stringify({
+              action: 'approve',
+              request_id: registrationId,
+              full_name: record.full_name,
+              jersey_name: record.jersey_name,
+              jersey_number: record.jersey_number,
+              position: record.position,
+              date_of_birth: record.date_of_birth,
+              phone: record.phone
+            })
+          });
+          db.players.push(result.player);
+          db.registration_requests = db.registration_requests.filter(request => request.id !== registrationId);
+          closeModal();
+          renderApp();
+          showToast(`${result.player.full_name} transferred to the official squad register.`);
+        } catch (error) {
+          showToast(`Could not transfer registration: ${error.message}`, true);
+        }
+        return;
+      }
       if (existingId) {
         const idx = db.players.findIndex(pl => pl.id === existingId);
         db.players[idx] = record;
