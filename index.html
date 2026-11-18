@@ -934,16 +934,6 @@
               <input name="phone" value="${escapeHtml(p?.phone || '+256 ')}" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
             </div>
             <div>
-              <label class="block text-xs font-semibold text-slate-600 mb-1">National ID (NIN)</label>
-              <input name="national_id" value="${escapeHtml(p?.national_id || '')}" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
-            </div>
-          </div>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label class="block text-xs font-semibold text-slate-600 mb-1">Guardian / Next of Kin</label>
-              <input name="guardian_contact" value="${escapeHtml(p?.guardian_contact || '')}" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
-            </div>
-            <div>
               <label class="block text-xs font-semibold text-slate-600 mb-1">Joined Date</label>
               <input name="joined_date" type="date" value="${escapeHtml(p?.joined_date || new Date().toISOString().slice(0, 10))}" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
             </div>
@@ -978,8 +968,8 @@
         position: fd.get('position'),
         date_of_birth: fd.get('date_of_birth'),
         phone: fd.get('phone').trim(),
-        guardian_contact: fd.get('guardian_contact').trim(),
-        national_id: fd.get('national_id').trim(),
+        guardian_contact: existingId ? db.players.find(pl => pl.id === existingId)?.guardian_contact || '' : '',
+        national_id: existingId ? db.players.find(pl => pl.id === existingId)?.national_id || '' : '',
         medical_notes: fd.get('medical_notes').trim() || 'Fit & Cleared',
         status: fd.get('status'),
         joined_date: fd.get('joined_date')
