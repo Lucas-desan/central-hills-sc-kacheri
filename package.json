@@ -2,11 +2,7 @@
   "name": "central_hills_sc_app",
   "version": "1.0.0",
   "type": "module",
-  "description": "Central Hills SC Club Management System",
-  "dependencies": {
-    "dotenv": "^16.4.5"
-  },
   "engines": {
-    "node": "26.x"
+    "node": "24.x"
   }
 }
