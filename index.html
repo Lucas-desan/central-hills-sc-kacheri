@@ -1084,7 +1084,13 @@
                   <span class="${Number(s.quantity_available) <= 5 ? 'text-rose-600 font-bold' : 'text-slate-600 font-semibold'}">
                     In Stock: ${s.quantity_available}
                   </span>
-                  ${isAdmin ? `<button onclick="restockItem('${s.id}')" class="text-forest-800 font-bold hover:underline">+5 Restock</button>` : '<span class="text-slate-400">Available</span>'}
+                  ${isAdmin ? `
+                    <div class="flex gap-2">
+                      <button onclick="restockItem('${s.id}')" class="text-forest-800 font-bold hover:underline">+5 Restock</button>
+                      <button onclick="openStockModal('${s.id}')" class="text-blue-700 font-bold hover:underline">Edit</button>
+                      <button onclick="deleteStockItem('${s.id}')" class="text-rose-700 font-bold hover:underline">Delete</button>
+                    </div>
+                  ` : '<span class="text-slate-400">Available</span>'}
                 </div>
               </div>
             `).join('')}
@@ -1132,6 +1138,8 @@
                         <td class="py-3 px-4 text-right space-x-1 whitespace-nowrap">
                           ${bal > 0 ? `<button onclick="clearUniformBalance('${o.id}')" class="px-2.5 py-1 rounded-lg bg-forest-800 text-white text-xs font-semibold">Clear Bal</button>` : ''}
                           ${o.delivery_status === 'Pending' ? `<button onclick="markOrderDelivered('${o.id}')" class="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 text-xs font-semibold">Deliver</button>` : ''}
+                          <button onclick="openOrderModal('${o.id}')" class="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 text-xs font-semibold">Edit</button>
+                          <button onclick="deleteOrder('${o.id}')" class="px-2.5 py-1 rounded-lg bg-rose-50 text-rose-700 text-xs font-semibold">Delete</button>
                         </td>
                       ` : ''}
                     </tr>
@@ -1154,112 +1162,129 @@
       showToast(`Added +5 units to ${item.item_name} (${item.size}).`);
     }
 
-    function openStockModal() {
+    function openStockModal(stockId = null) {
       if (!guardAdminAction()) return;
-      openModal('Add Uniform Stock Item', `
-        <form onsubmit="saveStockForm(event)" class="space-y-4 text-sm">
+      const item = stockId ? getStockItem(stockId) : null;
+      if (stockId && !item) return;
+      openModal(item ? 'Edit Uniform Stock Item' : 'Add Uniform Stock Item', `
+        <form onsubmit="saveStockForm(event, '${stockId || ''}')" class="space-y-4 text-sm">
           <div>
             <label class="block text-xs font-semibold text-slate-600 mb-1">Item Name *</label>
-            <input name="item_name" required placeholder="e.g. Away Kit (White/Gold)" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+            <input name="item_name" required value="${escapeHtml(item?.item_name || '')}" placeholder="e.g. Away Kit (White/Gold)" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
           </div>
           <div class="grid grid-cols-3 gap-3">
             <div>
               <label class="block text-xs font-semibold text-slate-600 mb-1">Size Category</label>
               <select name="size_category" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white">
-                <option value="Player">Player</option>
-                <option value="Fan">Fan</option>
+                <option value="Player" ${item?.size_category !== 'Fan' ? 'selected' : ''}>Player</option>
+                <option value="Fan" ${item?.size_category === 'Fan' ? 'selected' : ''}>Fan</option>
               </select>
             </div>
             <div>
               <label class="block text-xs font-semibold text-slate-600 mb-1">Size</label>
               <select name="size" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white">
-                ${['XS', 'S', 'M', 'L', 'XL', 'XXL'].map(sz => `<option value="${sz}">${sz}</option>`).join('')}
+                ${['XS', 'S', 'M', 'L', 'XL', 'XXL'].map(sz => `<option value="${sz}" ${item?.size === sz ? 'selected' : ''}>${sz}</option>`).join('')}
               </select>
             </div>
             <div>
               <label class="block text-xs font-semibold text-slate-600 mb-1">Unit Price (UGX) *</label>
-              <input name="unit_price_ugx" type="number" min="0" step="500" required class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+              <input name="unit_price_ugx" type="number" min="0" step="500" value="${item ? Number(item.unit_price_ugx) : ''}" required class="w-full px-3 py-2 rounded-xl border border-slate-300" />
             </div>
           </div>
           <div>
             <label class="block text-xs font-semibold text-slate-600 mb-1">Quantity Available *</label>
-            <input name="quantity_available" type="number" min="0" required class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+            <input name="quantity_available" type="number" min="0" value="${item ? Number(item.quantity_available) : ''}" required class="w-full px-3 py-2 rounded-xl border border-slate-300" />
           </div>
           <div class="flex justify-end gap-2 pt-2">
             <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-xl bg-slate-100 font-semibold">Cancel</button>
-            <button type="submit" class="px-5 py-2 rounded-xl bg-forest-800 text-white font-bold">Add Stock</button>
+            <button type="submit" class="px-5 py-2 rounded-xl bg-forest-800 text-white font-bold">${item ? 'Save Changes' : 'Add Stock'}</button>
           </div>
         </form>
       `);
     }
 
-    function saveStockForm(e) {
+    function saveStockForm(e, stockId = null) {
       e.preventDefault();
       if (!guardAdminAction()) return;
       const fd = new FormData(e.target);
-      db.uniform_stock.push({
-        id: nextId('STK', db.uniform_stock, 2),
+      const item = stockId ? getStockItem(stockId) : null;
+      if (stockId && !item) return;
+      const values = {
         item_name: fd.get('item_name').trim(),
         kit_type: fd.get('size_category') === 'Fan' ? 'Fan Jersey' : 'Match Kit',
         size_category: fd.get('size_category'),
         size: fd.get('size'),
         unit_price_ugx: Number(fd.get('unit_price_ugx')),
         quantity_available: Number(fd.get('quantity_available'))
-      });
+      };
+      if (item) Object.assign(item, values);
+      else db.uniform_stock.push({ id: nextId('STK', db.uniform_stock, 2), ...values });
       saveDatabase();
       closeModal();
       renderApp();
-      showToast('Uniform stock item added.');
+      showToast(item ? 'Uniform stock item updated.' : 'Uniform stock item added.');
     }
 
-    function openOrderModal() {
+    function deleteStockItem(stockId) {
       if (!guardAdminAction()) return;
-      openModal('New Kit Order (Player / Fan)', `
-        <form onsubmit="saveOrderForm(event)" class="space-y-4 text-sm">
+      const item = getStockItem(stockId);
+      if (!item) return;
+      if (db.uniform_orders.some(order => order.stock_id === stockId)) {
+        showToast('This stock item is linked to kit orders. Delete those orders before deleting the item.', true);
+        return;
+      }
+      if (!window.confirm(`Delete ${item.item_name} (${item.size}) from stock?`)) return;
+      db.uniform_stock = db.uniform_stock.filter(stock => stock.id !== stockId);
+      saveDatabase();
+      renderApp();
+      showToast('Uniform stock item deleted.');
+    }
+
+    function openOrderModal(orderId = null) {
+      if (!guardAdminAction()) return;
+      const order = orderId ? db.uniform_orders.find(item => item.id === orderId) : null;
+      if (orderId && !order) return;
+      openModal(order ? `Edit Kit Order — ${order.id}` : 'New Kit Order (Player / Fan)', `
+        <form onsubmit="saveOrderForm(event, '${orderId || ''}')" class="space-y-4 text-sm">
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label class="block text-xs font-semibold text-slate-600 mb-1">Linked Squad Player</label>
               <select name="player_id" onchange="syncOrderPlayerFields(this)" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white">
-                <option value="">— External Fan / Supporter —</option>
-                ${db.players.map(p => `<option value="${p.id}" data-jname="${escapeHtml(p.jersey_name)}" data-jno="${p.jersey_number}">#${p.jersey_number} ${escapeHtml(p.full_name)}</option>`).join('')}
+                <option value="" ${!order?.player_id ? 'selected' : ''}>— External Fan / Supporter —</option>
+                ${db.players.map(p => `<option value="${p.id}" ${order?.player_id === p.id ? 'selected' : ''} data-jname="${escapeHtml(p.jersey_name)}" data-jno="${p.jersey_number}">#${p.jersey_number} ${escapeHtml(p.full_name)}</option>`).join('')}
               </select>
             </div>
             <div>
               <label class="block text-xs font-semibold text-slate-600 mb-1">Select Kit Stock *</label>
               <select name="stock_id" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white">
-                ${db.uniform_stock.map(s => `<option value="${s.id}">${escapeHtml(s.item_name)} (${s.size_category} - ${s.size}) — ${formatUGX(s.unit_price_ugx)} [${s.quantity_available} left]</option>`).join('')}
+                ${db.uniform_stock.map(s => `<option value="${s.id}" ${order?.stock_id === s.id ? 'selected' : ''}>${escapeHtml(s.item_name)} (${escapeHtml(s.size_category)} - ${escapeHtml(s.size)}) — ${formatUGX(s.unit_price_ugx)} [${Number(s.quantity_available) + (order?.stock_id === s.id ? Number(order.quantity) : 0)} left]</option>`).join('')}
               </select>
             </div>
           </div>
           <div class="grid grid-cols-3 gap-3">
             <div>
               <label class="block text-xs font-semibold text-slate-600 mb-1">Jersey Name *</label>
-              <input id="ordJerseyName" name="jersey_name" required placeholder="e.g. MUGISHA" class="w-full px-3 py-2 rounded-xl border border-slate-300 uppercase font-mono" />
+              <input id="ordJerseyName" name="jersey_name" required value="${escapeHtml(order?.jersey_name || '')}" placeholder="e.g. MUGISHA" class="w-full px-3 py-2 rounded-xl border border-slate-300 uppercase font-mono" />
             </div>
             <div>
               <label class="block text-xs font-semibold text-slate-600 mb-1">Jersey No. *</label>
-              <input id="ordJerseyNo" name="jersey_number" type="number" min="0" max="99" required placeholder="10" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+              <input id="ordJerseyNo" name="jersey_number" type="number" min="0" max="99" value="${escapeHtml(order?.jersey_number || '')}" required placeholder="10" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
             </div>
             <div>
               <label class="block text-xs font-semibold text-slate-600 mb-1">Size Category *</label>
               <select name="size_category" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white">
-                <option value="Player - M">Player - M</option>
-                <option value="Player - L" selected>Player - L</option>
-                <option value="Player - XL">Player - XL</option>
-                <option value="Fan - M">Fan - M</option>
-                <option value="Fan - L">Fan - L</option>
-                <option value="Fan - XL">Fan - XL</option>
+                ${['Player - M', 'Player - L', 'Player - XL', 'Fan - M', 'Fan - L', 'Fan - XL'].map(size => `<option value="${size}" ${(order?.size_category || 'Player - L') === size ? 'selected' : ''}>${size}</option>`).join('')}
               </select>
             </div>
           </div>
           <div class="grid grid-cols-3 gap-3">
             <div>
               <label class="block text-xs font-semibold text-slate-600 mb-1">Quantity *</label>
-              <input name="quantity" type="number" min="1" value="1" required class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+              <input name="quantity" type="number" min="1" value="${order ? Number(order.quantity) : 1}" required class="w-full px-3 py-2 rounded-xl border border-slate-300" />
             </div>
             <div>
               <label class="block text-xs font-semibold text-slate-600 mb-1">Amount Paid (UGX)</label>
-              <input name="amount_paid_ugx" type="number" min="0" step="500" value="0" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+              <input name="amount_paid_ugx" type="number" min="0" step="500" value="${order ? Number(order.amount_paid_ugx) : 0}" ${order ? 'readonly' : ''} class="w-full px-3 py-2 rounded-xl border border-slate-300 ${order ? 'bg-slate-100' : ''}" />
             </div>
             <div>
               <label class="block text-xs font-semibold text-slate-600 mb-1">Method</label>
@@ -1268,9 +1293,18 @@
               </select>
             </div>
           </div>
+          ${order ? `
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Delivery Status</label>
+              <select name="delivery_status" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white">
+                ${['Pending', 'Delivered'].map(status => `<option value="${status}" ${order.delivery_status === status ? 'selected' : ''}>${status}</option>`).join('')}
+              </select>
+              <p class="mt-1 text-[11px] text-slate-500">Payments are managed through the balance action and finance records.</p>
+            </div>
+          ` : ''}
           <div class="flex justify-end gap-2 pt-2">
             <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-xl bg-slate-100 font-semibold">Cancel</button>
-            <button type="submit" class="px-5 py-2 rounded-xl bg-forest-800 text-white font-bold">Submit Kit Order</button>
+            <button type="submit" class="px-5 py-2 rounded-xl bg-forest-800 text-white font-bold">${order ? 'Save Changes' : 'Submit Kit Order'}</button>
           </div>
         </form>
       `);
@@ -1284,28 +1318,65 @@
       document.getElementById('ordJerseyNo').value = no;
     }
 
-    function saveOrderForm(e) {
+    function saveOrderForm(e, orderId = null) {
       e.preventDefault();
       if (!guardAdminAction()) return;
       const fd = new FormData(e.target);
+      const existingOrder = orderId ? db.uniform_orders.find(order => order.id === orderId) : null;
+      if (orderId && !existingOrder) return;
       const stock = getStockItem(fd.get('stock_id'));
       const qty = Number(fd.get('quantity'));
-      if (!stock || Number(stock.quantity_available) < qty) {
+      const previousStock = existingOrder ? getStockItem(existingOrder.stock_id) : null;
+      const available = stock ? Number(stock.quantity_available) + (existingOrder?.stock_id === stock.id ? Number(existingOrder.quantity) : 0) : 0;
+      if (!stock || available < qty) {
         showToast('Insufficient stock available for this item.', true);
         return;
       }
       const total = Number(stock.unit_price_ugx) * qty;
-      const paid = Math.min(total, Number(fd.get('amount_paid_ugx')) || 0);
+      const paid = existingOrder ? Number(existingOrder.amount_paid_ugx) : Math.min(total, Number(fd.get('amount_paid_ugx')) || 0);
+      if (paid > total) {
+        showToast('The revised order total cannot be less than the amount already paid.', true);
+        return;
+      }
       const playerId = fd.get('player_id') || null;
       const jName = fd.get('jersey_name').trim().toUpperCase();
       const jNo = fd.get('jersey_number').trim();
       const sizeCat = fd.get('size_category');
       const today = new Date().toISOString().slice(0, 10);
 
-      stock.quantity_available = Number(stock.quantity_available) - qty;
-      const orderId = nextId('ORD', db.uniform_orders, 3);
+      if (previousStock && previousStock.id !== stock.id) {
+        previousStock.quantity_available = Number(previousStock.quantity_available) + Number(existingOrder.quantity);
+      }
+      stock.quantity_available = available - qty;
+      if (existingOrder) {
+        Object.assign(existingOrder, {
+          player_id: playerId,
+          jersey_name: jName,
+          jersey_number: jNo,
+          size_category: sizeCat,
+          stock_id: stock.id,
+          quantity: qty,
+          total_amount_ugx: total,
+          payment_status: paid === 0 ? 'Unpaid' : paid >= total ? 'Paid' : 'Partial',
+          delivery_status: fd.get('delivery_status') || existingOrder.delivery_status
+        });
+        db.transactions.filter(tx => findTransactionLinks(tx).order?.id === orderId).forEach(tx => {
+          tx.uniform_order_id = orderId;
+          tx.player_id = playerId;
+          tx.payer_name = playerId ? getPlayer(playerId)?.full_name : `${jName} (Supporter)`;
+          tx.jersey_name = jName;
+          tx.jersey_number = jNo;
+          tx.size_category = sizeCat;
+        });
+        saveDatabase();
+        closeModal();
+        renderApp();
+        showToast(`Kit order ${orderId} updated.`);
+        return;
+      }
+      const newOrderId = nextId('ORD', db.uniform_orders, 3);
       db.uniform_orders.push({
-        id: orderId,
+        id: newOrderId,
         player_id: playerId,
         jersey_name: jName,
         jersey_number: jNo,
@@ -1325,7 +1396,7 @@
           receipt_number: nextReceiptNumber(),
           tx_type: 'Income',
           category: sizeCat.startsWith('Fan') ? 'Fan Jersey Sale' : 'Uniform Payment',
-          description: `${stock.item_name} (${orderId})`,
+          description: `${stock.item_name} (${newOrderId})`,
           player_id: playerId,
           payer_name: playerId ? getPlayer(playerId)?.full_name : `${jName} (Supporter)`,
           jersey_name: jName,
@@ -1334,14 +1405,29 @@
           amount_ugx: paid,
           payment_method: fd.get('payment_method'),
           tx_date: today,
-          recorded_by: 'Club Admin'
+          recorded_by: 'Club Admin',
+          uniform_order_id: newOrderId
         });
       }
 
       saveDatabase();
       closeModal();
       renderApp();
-      showToast(`Kit order ${orderId} saved.`);
+      showToast(`Kit order ${newOrderId} saved.`);
+    }
+
+    function deleteOrder(orderId) {
+      if (!guardAdminAction()) return;
+      const order = db.uniform_orders.find(item => item.id === orderId);
+      if (!order) return;
+      if (!window.confirm(`Delete kit order ${orderId}? Its recorded kit payments will also be removed and its stock returned.`)) return;
+      const stock = getStockItem(order.stock_id);
+      if (stock) stock.quantity_available = Number(stock.quantity_available) + Number(order.quantity);
+      db.transactions = db.transactions.filter(tx => findTransactionLinks(tx).order?.id !== orderId);
+      db.uniform_orders = db.uniform_orders.filter(item => item.id !== orderId);
+      saveDatabase();
+      renderApp();
+      showToast(`Kit order ${orderId} deleted and stock restored.`);
     }
 
     function clearUniformBalance(orderId) {
@@ -1367,7 +1453,8 @@
         amount_ugx: bal,
         payment_method: 'Cash',
         tx_date: new Date().toISOString().slice(0, 10),
-        recorded_by: 'Club Admin'
+        recorded_by: 'Club Admin',
+        uniform_order_id: orderId
       });
 
       saveDatabase();
@@ -1462,6 +1549,10 @@
                       </td>
                       <td class="py-3 px-4 text-right">
                         <button onclick="openReceiptModal('${t.id}')" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs font-semibold">View</button>
+                        ${isAdmin ? `
+                          <button onclick="openTransactionModal('${t.id}')" class="ml-1 px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 text-xs font-semibold">Edit</button>
+                          <button onclick="deleteTransaction('${t.id}')" class="ml-1 px-2.5 py-1 rounded-lg bg-rose-50 text-rose-700 text-xs font-semibold">Delete</button>
+                        ` : ''}
                       </td>
                     </tr>
                   `;
@@ -1473,38 +1564,42 @@
       `;
     }
 
-    function openTransactionModal() {
+    function openTransactionModal(txId = null) {
       if (!guardAdminAction()) return;
-      openModal('Record Financial Receipt or Expense', `
-        <form onsubmit="saveTransactionForm(event)" class="space-y-4 text-sm">
+      const transaction = txId ? db.transactions.find(item => item.id === txId) : null;
+      if (txId && !transaction) return;
+      const links = transaction ? findTransactionLinks(transaction) : null;
+      const isLinkedPayment = Boolean(links?.order || links?.fee);
+      openModal(transaction ? `Edit Receipt — ${transaction.receipt_number}` : 'Record Financial Receipt or Expense', `
+        <form onsubmit="saveTransactionForm(event, '${txId || ''}')" class="space-y-4 text-sm">
           <div class="grid grid-cols-2 gap-3">
             <div>
               <label class="block text-xs font-semibold text-slate-600 mb-1">Transaction Type *</label>
               <select name="tx_type" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white">
-                <option value="Income">Income (Official Receipt)</option>
-                <option value="Expense">Expense (Club Outflow)</option>
+                <option value="Income" ${!transaction || transaction.tx_type === 'Income' ? 'selected' : ''}>Income (Official Receipt)</option>
+                <option value="Expense" ${transaction?.tx_type === 'Expense' ? 'selected' : ''}>Expense (Club Outflow)</option>
               </select>
             </div>
             <div>
               <label class="block text-xs font-semibold text-slate-600 mb-1">Category *</label>
-              <input name="category" required placeholder="e.g. Uniform Payment, Fan Jersey, Match Referees" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+              <input name="category" required value="${escapeHtml(transaction?.category || '')}" placeholder="e.g. Uniform Payment, Fan Jersey, Match Referees" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
             </div>
           </div>
           <div>
             <label class="block text-xs font-semibold text-slate-600 mb-1">Description *</label>
-            <input name="description" required placeholder="Purpose of payment or expenditure" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+            <input name="description" required value="${escapeHtml(transaction?.description || '')}" placeholder="Purpose of payment or expenditure" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
           </div>
           <div class="grid grid-cols-2 gap-3">
             <div>
               <label class="block text-xs font-semibold text-slate-600 mb-1">Linked Squad Player (Optional)</label>
-              <select name="player_id" onchange="syncTxPlayerFields(this)" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white">
-                <option value="">— External Fan / Sponsor / Vendor —</option>
-                ${db.players.map(p => `<option value="${p.id}" data-fullname="${escapeHtml(p.full_name)}" data-jname="${escapeHtml(p.jersey_name)}" data-jno="${p.jersey_number}">#${p.jersey_number} ${escapeHtml(p.full_name)}</option>`).join('')}
+              <select name="player_id" onchange="syncTxPlayerFields(this)" ${isLinkedPayment ? 'disabled' : ''} class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white">
+                <option value="" ${!transaction?.player_id ? 'selected' : ''}>— External Fan / Sponsor / Vendor —</option>
+                ${db.players.map(p => `<option value="${p.id}" ${transaction?.player_id === p.id ? 'selected' : ''} data-fullname="${escapeHtml(p.full_name)}" data-jname="${escapeHtml(p.jersey_name)}" data-jno="${p.jersey_number}">#${p.jersey_number} ${escapeHtml(p.full_name)}</option>`).join('')}
               </select>
             </div>
             <div>
               <label class="block text-xs font-semibold text-slate-600 mb-1">Payer / Recipient Name *</label>
-              <input id="txPayerName" name="payer_name" required placeholder="Full name of payer or vendor" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+              <input id="txPayerName" name="payer_name" required value="${escapeHtml(transaction?.payer_name || '')}" placeholder="Full name of payer or vendor" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
             </div>
           </div>
 
@@ -1512,25 +1607,16 @@
           <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label class="block text-xs font-bold text-slate-700 mb-1">Jersey Name</label>
-              <input id="txJerseyName" name="jersey_name" placeholder="e.g. KATO or N/A" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white uppercase font-mono text-xs" />
+              <input id="txJerseyName" name="jersey_name" value="${escapeHtml(transaction?.jersey_name || '')}" placeholder="e.g. KATO or N/A" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white uppercase font-mono text-xs" />
             </div>
             <div>
               <label class="block text-xs font-bold text-slate-700 mb-1">Jersey No.</label>
-              <input id="txJerseyNo" name="jersey_number" placeholder="e.g. 4 or N/A" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white text-xs" />
+              <input id="txJerseyNo" name="jersey_number" value="${escapeHtml(transaction?.jersey_number || '')}" placeholder="e.g. 4 or N/A" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white text-xs" />
             </div>
             <div>
               <label class="block text-xs font-bold text-slate-700 mb-1">Size Category (Player/Fan)</label>
               <select name="size_category" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white text-xs font-semibold">
-                <option value="N/A">N/A (Non-Kit)</option>
-                <option value="Player - S">Player - S</option>
-                <option value="Player - M">Player - M</option>
-                <option value="Player - L">Player - L</option>
-                <option value="Player - XL">Player - XL</option>
-                <option value="Fan - S">Fan - S</option>
-                <option value="Fan - M">Fan - M</option>
-                <option value="Fan - L">Fan - L</option>
-                <option value="Fan - XL">Fan - XL</option>
-                <option value="Fan - XXL">Fan - XXL</option>
+                ${['N/A', 'Player - S', 'Player - M', 'Player - L', 'Player - XL', 'Fan - S', 'Fan - M', 'Fan - L', 'Fan - XL', 'Fan - XXL'].map(size => `<option value="${size}" ${(transaction?.size_category || 'N/A') === size ? 'selected' : ''}>${size === 'N/A' ? 'N/A (Non-Kit)' : size}</option>`).join('')}
               </select>
             </div>
           </div>
@@ -1538,22 +1624,22 @@
           <div class="grid grid-cols-3 gap-3">
             <div>
               <label class="block text-xs font-semibold text-slate-600 mb-1">Amount (UGX) *</label>
-              <input name="amount_ugx" type="number" min="500" step="500" required class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+              <input name="amount_ugx" type="number" min="500" step="500" value="${transaction ? Number(transaction.amount_ugx) : ''}" required class="w-full px-3 py-2 rounded-xl border border-slate-300" />
             </div>
             <div>
               <label class="block text-xs font-semibold text-slate-600 mb-1">Payment Method</label>
               <select name="payment_method" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white">
-                ${['Cash', 'MTN MoMo', 'Airtel Money', 'Bank Transfer'].map(m => `<option value="${m}">${m}</option>`).join('')}
+                ${['Cash', 'MTN MoMo', 'Airtel Money', 'Bank Transfer'].map(m => `<option value="${m}" ${transaction?.payment_method === m ? 'selected' : ''}>${m}</option>`).join('')}
               </select>
             </div>
             <div>
               <label class="block text-xs font-semibold text-slate-600 mb-1">Date *</label>
-              <input name="tx_date" type="date" required value="${new Date().toISOString().slice(0, 10)}" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+              <input name="tx_date" type="date" required value="${escapeHtml(transaction?.tx_date || new Date().toISOString().slice(0, 10))}" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
             </div>
           </div>
           <div class="flex justify-end gap-2 pt-2">
             <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-xl bg-slate-100 font-semibold">Cancel</button>
-            <button type="submit" class="px-5 py-2 rounded-xl bg-forest-800 text-white font-bold">Save & Generate Receipt</button>
+            <button type="submit" class="px-5 py-2 rounded-xl bg-forest-800 text-white font-bold">${transaction ? 'Save Changes' : 'Save & Generate Receipt'}</button>
           </div>
         </form>
       `);
@@ -1567,31 +1653,107 @@
       document.getElementById('txJerseyNo').value = opt.getAttribute('data-jno') || '';
     }
 
-    function saveTransactionForm(e) {
+    function findTransactionLinks(transaction) {
+      const linkedOrder = db.uniform_orders.find(order =>
+        transaction.uniform_order_id === order.id ||
+        String(transaction.description || '').includes(`(${order.id})`)
+      ) || (() => {
+        const candidates = db.uniform_orders.filter(order =>
+          transaction.player_id &&
+          order.player_id === transaction.player_id &&
+          String(transaction.category || '').toLowerCase().includes('uniform')
+        );
+        return candidates.length === 1 ? candidates[0] : null;
+      })();
+      const linkedFee = db.membership_fees.find(fee => transaction.membership_fee_id === fee.id) || (() => {
+        if (transaction.category !== 'Membership Fee') return null;
+        const candidates = db.membership_fees.filter(fee =>
+          fee.player_id === transaction.player_id &&
+          transaction.description === `${fee.period_label} ${fee.fee_type}`
+        );
+        return candidates.length === 1 ? candidates[0] : null;
+      })();
+      return { order: linkedOrder, fee: linkedFee };
+    }
+
+    function adjustLinkedPayment(links, delta) {
+      if (links.order) {
+        links.order.amount_paid_ugx = Math.max(0, Number(links.order.amount_paid_ugx) + delta);
+        links.order.payment_status = links.order.amount_paid_ugx >= Number(links.order.total_amount_ugx)
+          ? 'Paid'
+          : links.order.amount_paid_ugx > 0 ? 'Partial' : 'Unpaid';
+      }
+      if (links.fee) {
+        links.fee.amount_paid_ugx = Math.max(0, Number(links.fee.amount_paid_ugx) + delta);
+        links.fee.status = links.fee.amount_paid_ugx >= Number(links.fee.amount_due_ugx)
+          ? 'Paid'
+          : links.fee.amount_paid_ugx > 0 ? 'Partial'
+            : links.fee.due_date < new Date().toISOString().slice(0, 10) ? 'Overdue' : 'Pending';
+      }
+    }
+
+    function saveTransactionForm(e, txId = null) {
       e.preventDefault();
       if (!guardAdminAction()) return;
       const fd = new FormData(e.target);
-      const rct = nextReceiptNumber();
-      db.transactions.push({
-        id: nextId('TX', db.transactions, 3),
-        receipt_number: rct,
+      const existing = txId ? db.transactions.find(item => item.id === txId) : null;
+      if (txId && !existing) return;
+      const rct = existing ? existing.receipt_number : nextReceiptNumber();
+      const values = {
         tx_type: fd.get('tx_type'),
         category: fd.get('category').trim(),
         description: fd.get('description').trim(),
-        player_id: fd.get('player_id') || null,
+        player_id: fd.get('player_id') || existing?.player_id || null,
         payer_name: fd.get('payer_name').trim(),
         jersey_name: (fd.get('jersey_name').trim() || 'N/A').toUpperCase(),
         jersey_number: fd.get('jersey_number').trim() || 'N/A',
         size_category: fd.get('size_category') || 'N/A',
         amount_ugx: Number(fd.get('amount_ugx')),
         payment_method: fd.get('payment_method'),
-        tx_date: fd.get('tx_date'),
-        recorded_by: 'Club Admin'
-      });
+        tx_date: fd.get('tx_date')
+      };
+      if (existing) {
+        const links = findTransactionLinks(existing);
+        const oldContribution = existing.tx_type === 'Income' ? Number(existing.amount_ugx) : 0;
+        const newContribution = values.tx_type === 'Income' ? values.amount_ugx : 0;
+        const delta = newContribution - oldContribution;
+        if (links.order && Number(links.order.amount_paid_ugx) + delta > Number(links.order.total_amount_ugx)) {
+          showToast('This change would make the kit order payments exceed its total.', true);
+          return;
+        }
+        if (links.fee && Number(links.fee.amount_paid_ugx) + delta > Number(links.fee.amount_due_ugx)) {
+          showToast('This change would make the membership fee payments exceed the amount due.', true);
+          return;
+        }
+        if (links.order) values.uniform_order_id = links.order.id;
+        if (links.fee) values.membership_fee_id = links.fee.id;
+        Object.assign(existing, values);
+        adjustLinkedPayment(links, delta);
+      } else {
+        db.transactions.push({
+          id: nextId('TX', db.transactions, 3),
+          receipt_number: rct,
+          ...values,
+          recorded_by: 'Club Admin'
+        });
+      }
       saveDatabase();
       closeModal();
       renderApp();
-      showToast(`Receipt ${rct} recorded.`);
+      showToast(existing ? `Receipt ${rct} updated.` : `Receipt ${rct} recorded.`);
+    }
+
+    function deleteTransaction(txId) {
+      if (!guardAdminAction()) return;
+      const transaction = db.transactions.find(item => item.id === txId);
+      if (!transaction) return;
+      if (!window.confirm(`Delete receipt ${transaction.receipt_number}? Any linked order or membership balance will be updated.`)) return;
+      const links = findTransactionLinks(transaction);
+      if (transaction.tx_type === 'Income') adjustLinkedPayment(links, -Number(transaction.amount_ugx));
+      db.transactions = db.transactions.filter(item => item.id !== txId);
+      saveDatabase();
+      renderApp();
+      showToast(`Receipt ${transaction.receipt_number} deleted.`);
     }
 
     function openReceiptModal(txId) {
@@ -1732,8 +1894,10 @@
                       </td>
                       <td class="py-3 px-4"><span class="px-2.5 py-0.5 rounded-full text-xs font-bold ${badge}">${escapeHtml(f.status)}</span></td>
                       ${isAdmin ? `
-                        <td class="py-3 px-4 text-right">
-                          ${bal > 0 ? `<button onclick="openFeePayModal('${f.id}')" class="px-3 py-1 rounded-lg bg-forest-800 text-white text-xs font-semibold">Record Payment</button>` : '<span class="text-xs text-slate-400">Cleared</span>'}
+                        <td class="py-3 px-4 text-right whitespace-nowrap">
+                          ${bal > 0 ? `<button onclick="openFeePayModal('${f.id}')" class="px-2.5 py-1 rounded-lg bg-forest-800 text-white text-xs font-semibold">Record Payment</button>` : ''}
+                          <button onclick="openFeeModal('${f.id}')" class="ml-1 px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 text-xs font-semibold">Edit</button>
+                          <button onclick="deleteFee('${f.id}')" class="ml-1 px-2.5 py-1 rounded-lg bg-rose-50 text-rose-700 text-xs font-semibold">Delete</button>
                         </td>
                       ` : ''}
                     </tr>
@@ -1744,6 +1908,110 @@
           </div>
         </div>
       `;
+    }
+
+    function openFeeModal(feeId) {
+      if (!guardAdminAction()) return;
+      const fee = db.membership_fees.find(item => item.id === feeId);
+      if (!fee) return;
+      openModal(`Edit Membership Fee — ${fee.id}`, `
+        <form onsubmit="saveFeeForm(event, '${fee.id}')" class="space-y-4 text-sm">
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Player *</label>
+            <select name="player_id" required class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white">
+              ${db.players.map(player => `<option value="${player.id}" ${fee.player_id === player.id ? 'selected' : ''}>#${player.jersey_number} ${escapeHtml(player.full_name)}</option>`).join('')}
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Period Label *</label>
+            <input name="period_label" required value="${escapeHtml(fee.period_label)}" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Fee Type *</label>
+              <select name="fee_type" required class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white">
+                ${['Monthly Subscription', 'Annual Registration', 'Tournament Levy'].map(type => `<option value="${type}" ${fee.fee_type === type ? 'selected' : ''}>${type}</option>`).join('')}
+                ${!['Monthly Subscription', 'Annual Registration', 'Tournament Levy'].includes(fee.fee_type) ? `<option value="${escapeHtml(fee.fee_type)}" selected>${escapeHtml(fee.fee_type)}</option>` : ''}
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Amount Due (UGX) *</label>
+              <input name="amount_due_ugx" type="number" min="${Number(fee.amount_paid_ugx)}" step="500" value="${Number(fee.amount_due_ugx)}" required class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Due Date *</label>
+            <input name="due_date" type="date" required value="${escapeHtml(fee.due_date)}" class="w-full px-3 py-2 rounded-xl border border-slate-300" />
+          </div>
+          <p class="text-xs text-slate-500">Recorded payments (${formatUGX(fee.amount_paid_ugx)}) are managed through receipts and cannot be changed here.</p>
+          <div class="flex justify-end gap-2 pt-2">
+            <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-xl bg-slate-100 font-semibold">Cancel</button>
+            <button type="submit" class="px-5 py-2 rounded-xl bg-forest-800 text-white font-bold">Save Changes</button>
+          </div>
+        </form>
+      `);
+    }
+
+    function saveFeeForm(e, feeId) {
+      e.preventDefault();
+      if (!guardAdminAction()) return;
+      const fee = db.membership_fees.find(item => item.id === feeId);
+      if (!fee) return;
+      const fd = new FormData(e.target);
+      const values = {
+        player_id: fd.get('player_id'),
+        period_label: fd.get('period_label').trim(),
+        fee_type: fd.get('fee_type'),
+        amount_due_ugx: Number(fd.get('amount_due_ugx')),
+        due_date: fd.get('due_date')
+      };
+      if (values.amount_due_ugx < Number(fee.amount_paid_ugx)) {
+        showToast('Amount due cannot be less than payments already recorded.', true);
+        return;
+      }
+      const duplicate = db.membership_fees.some(item =>
+        item.id !== feeId &&
+        item.player_id === values.player_id &&
+        item.period_label === values.period_label &&
+        item.fee_type === values.fee_type
+      );
+      if (duplicate) {
+        showToast('This player already has a record for that period and fee type.', true);
+        return;
+      }
+      const linkedFeeTransactions = db.transactions.filter(tx => findTransactionLinks(tx).fee?.id === feeId);
+      Object.assign(fee, values);
+      fee.status = Number(fee.amount_paid_ugx) >= values.amount_due_ugx
+        ? 'Paid'
+        : Number(fee.amount_paid_ugx) > 0 ? 'Partial'
+          : values.due_date < new Date().toISOString().slice(0, 10) ? 'Overdue' : 'Pending';
+      linkedFeeTransactions.forEach(tx => {
+        tx.membership_fee_id = feeId;
+        tx.player_id = fee.player_id;
+        const player = getPlayer(fee.player_id);
+        tx.payer_name = player?.full_name || fee.player_id;
+        tx.description = `${fee.period_label} ${fee.fee_type}`;
+        tx.jersey_name = player?.jersey_name || 'N/A';
+        tx.jersey_number = player ? String(player.jersey_number) : 'N/A';
+      });
+      saveDatabase();
+      closeModal();
+      renderApp();
+      showToast(`Membership fee ${feeId} updated.`);
+    }
+
+    function deleteFee(feeId) {
+      if (!guardAdminAction()) return;
+      const fee = db.membership_fees.find(item => item.id === feeId);
+      if (!fee) return;
+      if (!window.confirm(`Delete ${fee.period_label} ${fee.fee_type} for ${getPlayerDisplay(fee.player_id)}? Existing payment receipts will remain in the finance ledger.`)) return;
+      db.membership_fees = db.membership_fees.filter(item => item.id !== feeId);
+      db.transactions.forEach(tx => {
+        if (tx.membership_fee_id === feeId) delete tx.membership_fee_id;
+      });
+      saveDatabase();
+      renderApp();
+      showToast(`Membership fee ${feeId} deleted.`);
     }
 
     function openBulkFeeModal() {
@@ -1866,7 +2134,8 @@
         amount_ugx: payAmt,
         payment_method: fd.get('payment_method'),
         tx_date: new Date().toISOString().slice(0, 10),
-        recorded_by: 'Club Admin'
+        recorded_by: 'Club Admin',
+        membership_fee_id: feeId
       });
 
       saveDatabase();
