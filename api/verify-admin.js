@@ -1,17 +1,24 @@
 export default function handler(req, res) {
-  // Only allow POST requests for security
+  // 1. Ensure the request method is POST
   if (req.method !== 'POST') {
-    return res.status(405).json({ success: false, message: 'Method not allowed' });
+    res.setHeader('Allow', ['POST']);
+    return res.status(405).json({ success: false, message: `Method ${req.method} Not Allowed` });
   }
 
-  const { pin } = req.body || {};
-  
-  // Pulls the password securely from Vercel Environment Variables
-  const correctPin = process.env.ADMIN_PAGE || "18102001";
+  try {
+    // 2. Parse the body safely (handles both raw text and parsed JSON)
+    const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+    const { pin } = body || {};
 
-  if (pin === correctPin) {
-    return res.status(200).json({ success: true, message: 'Authorized' });
-  } else {
-    return res.status(401).json({ success: false, message: 'Incorrect Admin PIN' });
+    // 3. Match against your environment variable (or a fallback PIN for testing)
+    const expectedPin = process.env.ADMIN_PIN || "1234567";
+
+    if (pin === expectedPin) {
+      return res.status(200).json({ success: true, message: "Authorized successfully" });
+    }
+
+    return res.status(401).json({ success: false, message: "Invalid Admin PIN" });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: "Server error processing request" });
   }
 }
